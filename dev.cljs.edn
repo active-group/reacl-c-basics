@@ -1,0 +1,4 @@
+^{:auto-testing true
+  :extra-main-files {}
+  :watch-dirs ["src" "test" #_"examples"]}
+{:main reacl-c-basics.test.runner}
