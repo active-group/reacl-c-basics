@@ -2,6 +2,7 @@
   (:require [reacl-c.core :as c]
             [reacl-c.browser :as browser]
             [reacl2.core :as rcore :include-macros true]
+            [reacl-basics.pages.routes :as routes]
             [reacl-basics.pages.core :as p]))
 
 ;; Note: use together with reacl-basics.pages.routes and reacl-basics.pages.ring
@@ -44,3 +45,10 @@
   "Returns an action to go to the given path."
   [path]
   (p/goto path))
+
+(defn href
+  "Return an url string for the given route, with arguments for the
+  positional and maybe a map for query params as required by the given
+  route."
+  [route & params]
+  (apply routes/href route params))

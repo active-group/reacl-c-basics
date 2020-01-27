@@ -20,6 +20,10 @@
 
         pages {home (routing/page home-page)
                person (routing/page person-page)}]
+
+    (is (= "/home" (routing/href home)))
+    (is (= "/person/42" (routing/href person 42)))
+    (is (= "/person/42?a=foo%20bar" (routing/href person 42 {:a "foo bar"})))
     
     (async done
            (let [hist-nav! (atom nil)
