@@ -31,3 +31,39 @@
                                                :preventDefault (fn [] nil)}))))
 
   )
+
+(deftest input-number-test
+  (let [e (tu/env (forms/input-number))
+
+        current-input (fn []
+                        (-> (tu/get-component e)
+                            (xpath/select (xpath/>> ** "input"))))
+        current-text (fn []
+                       (-> (current-input)
+                           (.-props)
+                           (.-value)))
+
+        enter-text (fn [txt]
+                     (let [comp (current-input)]
+                       (tu/invoke-callback! comp :onchange
+                                          #js {:type "change" :target #js {:value txt}})))]
+
+    (testing "shows initial value"
+      (is (= (c/return)
+             (tu/mount! e 42)))
+      (is (= "42" (current-text))))
+
+    (testing "show updated value"
+      (is (= (c/return)
+             (tu/update! e 21)))
+      (is (= "21" (current-text))))
+
+    (testing "returns value when new valid input"
+      (is (= (c/return :state 10)
+             (enter-text "10"))))
+
+    (testing "returns nil but keeps text on invalid input"
+      (is (= (c/return :state nil)
+             (enter-text "foobar")))
+      (tu/update! e nil)
+      (is (= "foobar" (current-text))))))

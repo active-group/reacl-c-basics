@@ -34,8 +34,86 @@
 (defn input-string [& args]
   (apply input-value dom/input args))
 
+(defn- input-parsed-lens
+  ([parse restrict unparse [value {text :text pub-value :pub}]]
+   ;; keep with the text the user entered, until a value comes in from outside that the input did not publish itself.
+   (if (not= value pub-value)
+     (unparse value)
+     text))
+  ([parse restrict unparse [value {text :text pub-value :pub}] new-text]
+   (if (not= text new-text)
+     (let [mod-text (restrict text new-text)
+           new (parse mod-text)]
+       [new {:text mod-text :pub new}])
+     [value {:text text :pub pub-value}])))
+
+(c/defn-dynamic ^:no-doc input-parsed value [parse unparse restrict & args]
+  ;; (unparse state) => string
+  ;; (parse string) => value
+  ;; (restrict string) => string, preventing some input while typing.
+  (c/local-state (-> (apply input-string args)
+                     (c/focus (c/partial input-parsed-lens parse restrict unparse)))
+                 {:text (unparse value)
+                  :pub value}))
+
+(defn- parse-number [s]
+  ;; Note: "" parses as NaN although it's not isNaN; parseFloat ignores trailing extra chars; but isNaN does not:
+  (let [x (when (not (js/isNaN s))
+            (.parseFloat js/Number s))]
+    (if (js/isNaN x)
+      nil
+      x)))
+
+(defn- unparse-number [v]
+  (if v (str v) ""))
+
+(defn- unrestricted [old new]
+  new)
+
+(c/defn-named input-number [& args]
+  (let [[attrs content] (core/split-dom-attrs args)]
+    (apply input-parsed parse-number unparse-number unrestricted
+           (merge {:type "number"}
+                  attrs)
+           content)))
+
+(def ^:private integer-regex #"^[-]?\d*$")
+
+(defn- parse-int [s]
+  ;; see parse-number above - we additionally set a regex :pattern attribute (allegedly helps mobiles to show a number input)
+  ;; and use the same here, because otherwise we would parse invalid inputs.
+  (let [x (when (and (not (js/isNaN s))
+                     (.test integer-regex s))
+            (.parseInt js/Number s))]
+    (if (js/isNaN x)
+      nil
+      (if (integer? x) ;; probably always the case
+        x
+        nil))))
+
+(defn- unparse-int [v]
+  (if v (str v) ""))
+
+(defn- restrict-int-chars [old new]
+  (apply str (filter #(.test #"[0-9-]" %) new)))
+
+(c/defn-named input-int [& args]
+  (let [[attrs content] (core/split-dom-attrs args)]
+    (apply input-parsed parse-int unparse-int
+           ;; Note with type 'number' we don't even see a lot of the 'invalid' inputs; so restrict-int-chars makes only sense for :text
+           ;; But that should not be used - on smart phones, the number pad usually only shows up for :type "number".
+           (if (= "text" (:type attrs))
+             restrict-int-chars
+             unrestricted)
+           (merge {:pattern #(or % integer-regex)}
+                  attrs)
+           content)))
+
 (defn textarea [& args]
   (apply input-value dom/textarea args))
+
+(defn select [& args]
+  (apply input-value dom/select args))
 
 (core/defn-dom submit-button [attrs & content]
   (apply dom/button (merge {:type "submit"} attrs)
