@@ -10,6 +10,8 @@
                  [org.clojure/clojurescript "1.10.238" :scope "provided"]
                  [de.active-group/active-clojure "0.33.0"]
                  [de.active-group/reacl-c "0.2.0-SNAPSHOT"]
+                 [reacl "2.2.0"]
+                 [reacl-basics "0.1.0-SNAPSHOT"]
                  [cljs-ajax "0.7.5"]]
 
   :plugins [[lein-codox "0.10.7"]
