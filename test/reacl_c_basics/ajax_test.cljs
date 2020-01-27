@@ -25,7 +25,7 @@
          (let [started (atom false)
                dummy (dummy-ajax started [true ::value])]
            (let [env (tu/env (ajax/fetch-once (ajax/request dummy "uri")
-                                              (fn [_ _]
+                                              (fn [_]
                                                 (done)
                                                 (c/return))))]
              (is (not @started))
@@ -36,7 +36,7 @@
   (async done
          (let [dummy (dummy-ajax nil [true ::value])]
            (let [env (tu/env (ajax/fetch-once (ajax/request dummy "uri")
-                                              (fn [_ response]
+                                              (fn [response]
                                                 (is (ajax/response-ok? response))
                                                 (is (= ::value (ajax/response-value response)))
                                                 (done)
@@ -47,7 +47,7 @@
   (async done
          (let [dummy (dummy-ajax nil [false {:v ::error}])]
            (let [env (tu/env (ajax/fetch-once (ajax/request dummy "uri")
-                                              (fn [_ response]
+                                              (fn [response]
                                                 (is (not (ajax/response-ok? response)))
                                                 (is (= {:v ::error} (ajax/response-value response)))
                                                 (done)
@@ -55,14 +55,14 @@
              (tu/mount! env nil)))))
 
 (defn execute-dummy [result]
-  (let [a (constantly result)
+  (let [a (c/return :action result)
         h (fn [state _ f args]
-            (js/console.log "Complete!")
             (apply f state result args))]
     (fn [req f & args]
       ;; if result = nil, it never completes; otherwise immediately on mount.
-      (cond-> (c/fragment)
-        (some? result) (c/did-mount a)))))
+      (if (some? result)
+        (c/did-mount a)
+        (c/fragment)))))
 
 (deftest fetch-test
   ;; fetch puts the response into a slot in the state.
@@ -79,28 +79,43 @@
 ;; TODO show-response-value ?
 
 (deftest delivery-queue-test
-  (let [mk-env #(tu/env (ajax/delivery-queue (dom/div) :queue))
+  (let [req  (ajax/GET "/url")
+        job (ajax/delivery-job req :info)
 
-        resp (#'ajax/make-response true :value :req)
-        req  (ajax/GET "/url")
+        resp (#'ajax/make-response true :value req)
 
-        job (ajax/delivery-job req :info :id)]
-    (testing "starts running on mount"
+        prog (-> (dom/div)
+                 (c/named "program")) 
+        
+        mk-env (fn [& [options]] (tu/env (ajax/delivery-queue prog :queue options)))]
+    (testing "starts running an action"
       (let [env (mk-env)]
         (tu/provided [ajax/execute (execute-dummy nil)]
+                     (tu/mount! env {:queue []})
+                     (is (= (c/return :state {:queue [(assoc job :status :pending)]})
+                            (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** "program"))
+                                               job)))
                      (is (= (c/return :state {:queue [(assoc job :status :running)]})
-                            (tu/mount! env {:queue [job]})))))
+                            (tu/update! env {:queue [(assoc job :status :pending)]})))))
       )
-    ;; TODO: can this work? because it's a state change after mount, which might not work in test env?
-    #_(testing "completes eventually"
+    (testing "completes eventually"
       (let [env (mk-env)]
         (tu/provided [ajax/execute (execute-dummy resp)]
                      ;; Note: it completes immediately, because of our fetch-once-dummy
                      (tu/mount! env {:queue []})
                      ;; Note: job = (async/deliver req), but not with an unknown id.
-                     (is (= (c/return :state {:queue [(assoc job :status :completed)]})
-                            (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** "div"))
-                                               job)))))
+                     (is (= (c/return :state {:queue [(assoc job :status :pending)]})
+                            (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** "program"))
+                                               job)))
+                     (is (= (c/return :state {:queue [(assoc job :status :completed :response resp)]})
+                            (tu/update! env {:queue [(assoc job :status :pending)]})))))
       )
-    )
-  )
+    (testing "does automatic cleanup"
+      (let [env (mk-env {:auto-cleanup? true})]
+        (tu/provided [ajax/execute (execute-dummy resp)]
+                     ;; Note: it completes immediately, because of our fetch-once-dummy
+                     (tu/mount! env {:queue []})
+                     (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** "program"))
+                                        job)
+                     (is (= (c/return :state {:queue []})
+                            (tu/update! env {:queue [(assoc job :status :pending)]}))))))))

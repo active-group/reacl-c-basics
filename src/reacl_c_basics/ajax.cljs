@@ -2,6 +2,7 @@
   (:require [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom]
             [active.clojure.cljs.record :as r :include-macros true]
+            [active.clojure.lens :as lens :include-macros true]
             [ajax.core :as ajax]))
 
 (defn check-options-invariants! [options]
@@ -31,39 +32,39 @@
 (defn PATCH [uri & [options]] (request ajax/PATCH uri options))
 (defn PURGE [uri & [options]] (request ajax/PURGE uri options))
 
-(c/defn-subscription ^:private execute deliver! [request]
+(defn- execute-request! [request handler]
   (let [{f :f uri :uri options :options} request
         nopts (assoc options
                      :handler
                      (fn [response]
-                       (deliver! (make-response true response request)))
+                       (handler (make-response true response request)))
                      :error-handler
                      (fn [error]
                        (when (not= :aborted (:failure error))
-                         (deliver! (make-response false error request)))))
-        id (f uri nopts)]
+                         (handler (make-response false error request)))))]
+    (f uri nopts)))
+
+(c/defn-subscription ^:private execute deliver! [request]
+  (let [id (execute-request! request deliver!)]
     (fn []
       (ajax/abort id))))
 
 ;; fetching data from server ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(let [handler (fn [state response f args]
-                (assert (response? response))
-                (apply f state response args))]
-  (defn fetch-once
+(defn fetch-once
     "Returns an invisible element, that will execute the given Ajax
   request once, when mounted. When the request completes with an error
-  or success, then `(f state response & args)` is evaluated, which
+  or success, then `(f response)` is evaluated, which
   must return a [[reacl-c.core/return]] value."
-    [req f & args]
+    [req f]
     (-> (execute req)
-        (c/handle-action handler f args))))
+        (c/handle-action f)))
 
-(let [handler (fn [state response]
+(let [handler (fn [response]
                 (assert (response? response))
                 (c/return :state response))]
-  (c/defn-dynamic fetch state [req]
-    (if (some? state)
+  (c/defn-dynamic fetch response [req]
+    (if (some? response)
       (c/fragment)
       (fetch-once req handler))))
 
@@ -78,10 +79,10 @@
     (or e-error throw-on-error)))
 
 (defn show-response-value
-  "Returns an element showing the value of an Ajax response, with
+  "Returns an element showing the state of an Ajax response, with
   alternative elements for ok and error states. The error part
   defaults to an element that throws an ex-info error
-  with :type :arbeitskarten.webui.util.ajax/error"
+  with `:type :reacl-c-basics.ajax/error`."
   [e-ok & [e-error]]
   (let [e-ok (c/focus e-ok response-value)
         e-error (when e-error
@@ -114,40 +115,33 @@
   [req & [info]]
   (make-delivery-job (gensym "delivery-job") req info :pending nil))
 
-(def ^:no-doc delivery-queue-auto-cleanup
-  (-> (c/did-update (c/fragment)
-                    (fn [_] ::update))
-      (c/handle-action (fn [queue _]
-                         (if (some completed? queue)
-                           (c/return :state (into (empty queue)
-                                                  (remove completed? queue)))
-                           (c/return))))))
+;; TODO: not sure if this a good idea; maybe a timed cleanup is better?
+(let [h (fn [lens old new]
+          (c/return :state (lens/shove new
+                                       lens
+                                       (let [queue (lens/yank new lens)]
+                                         (into (empty queue) (remove #(and (completed? %)
+                                                                           (response-ok? (:response %)))
+                                                                     queue))))))]
+  (defn ^:no-doc delivery-queue-auto-cleanup [e lens]
+    (c/capture-state-change e (c/partial h lens))))
 
-(let [handler (fn [state a lens]
+(let [handler (fn [state lens a]
                 (if (instance? DeliveryJob a)
-                  (let [queue (lens state)]
-                    (c/return :state (lens state (into (empty queue) (concat queue (list a))))))
+                  (let [queue (lens/yank state lens)]
+                    (c/return :state (lens/shove state lens (into (empty queue) (concat queue (list a))))))
                   (c/return :action a)))]
-  (c/defn-named ^:no-doc delivery-queue-handler [e lens]
-    (c/handle-action e handler lens)))
+  (c/defn-dynamic ^:no-doc delivery-queue-handler state [e lens]
+    (c/handle-action e (c/partial handler state lens))))
 
-(defn ^:private do-execute-job [job]
-  (js/console.log "executing job:" job)
-  (execute (:req job)))
-
-(def ^:private execute-job
-  (-> (c/dynamic do-execute-job)
-      (c/did-mount (constantly ::start))
-      (c/handle-action (fn [job a]
-                         (cond
-                           (response? a)
-                           (let [response a]
-                             (c/return :state (assoc job
-                                                     :status :completed
-                                                     :response response)))
-                           :else
-                           (do (assert (= ::start a))
-                               (c/return :state (update job :status #(if (= :pending %) :running %)))))))))
+(c/def-dynamic ^:private execute-job job
+  (c/fragment (c/did-mount (c/return :state (update job :status #(if (= :pending %) :running %))))
+              (fetch-once (:req job)
+                          (fn [a]
+                            (assert (response? a))
+                            (c/return :state (assoc job
+                                                    :status :completed
+                                                    :response a))))))
 
 (defrecord ^:private JobLens [id]
   IFn
@@ -161,7 +155,7 @@
                    job))
                queue))))
 
-(c/def-dynamic ^:no-doc delivery-queue-executor queue
+(c/def-dynamic ^:private delivery-queue-executor queue
   (apply c/fragment
          (map (fn [job]
                 (-> (c/focus execute-job (JobLens. (:id job)))
@@ -176,14 +170,15 @@
   to it, or use [[deliver]] to get an action that can be emitted by
   `e`. Jobs in the :pending state are executed in parallel,
   transitioning into the :running state, and end in the :completed
-  state (irrespective of success or failure). When new jobs are added,
-  completed jobs are removed from the queue."
-  [e lens]
-  ;; TODO: maybe options that can influence the cleanup of the queue? No cleanup, timed cleanup? Let someone react to completion and decide there?
-  (c/fragment (delivery-queue-handler e lens) ;; adds delivery actions to the queue
-              (c/focus delivery-queue-executor lens) ;; drives executing and waiting for a response
-              (c/focus delivery-queue-auto-cleanup lens) ;; removes completed jobs on update.
-              ))
+  state (irrespective of success or failure). When `(:auto-cleanup?
+  options)` is true, sucessfully completed jobs are eventually removed
+  from the queue automaticall."
+  [e lens & [options]]
+  (cond-> (c/fragment (delivery-queue-handler e lens) ;; adds delivery actions to the queue
+                      (c/focus delivery-queue-executor lens) ;; drives executing and waiting for a response
+                      )
+    (:auto-cleanup? options) (delivery-queue-auto-cleanup lens) ;; removes successfully completed jobs when new state bubbles up
+    ))
 
 
 (defn deliver
