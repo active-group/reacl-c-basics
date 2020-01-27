@@ -134,13 +134,15 @@
          (cond-> (merge (when-let [default (:default attrs)]
                           {:onreset (c/constantly (c/return :state default))})
                         attrs)
+           true (dissoc :default)
            (:onsubmit attrs) (assoc :onsubmit (c/partial submitter (:onsubmit attrs) value)))
          content))
 
-(c/defn-named local-form [default & args]
+(c/defn-named local-form [& args]
+  ;; :default should be the default state value.
   ;; :onsubmit should be a fn of submitted value => return
   ;; :onreset is added and resets to the default value.
   (let [[attrs content] (core/split-dom-attrs args)]
-    (c/isolate-state default
-                     (apply form (assoc attrs :default default)
+    (c/isolate-state (:default attrs)
+                     (apply form attrs
                             content))))
