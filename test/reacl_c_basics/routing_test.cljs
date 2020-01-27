@@ -18,8 +18,8 @@
         person-page (fn [id & [params]]
                       (dom/div "Person: " (str id) " " (str (:a params))))
 
-        pages {home (routing/page home-page)
-               person (routing/page person-page)}]
+        pages {home home-page
+               person person-page}]
 
     (is (= "/home" (routing/href home)))
     (is (= "/person/42" (routing/href person 42)))

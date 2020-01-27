@@ -21,17 +21,23 @@
   (apply reacl-page* (assoc-in opt [:map :app-state] state)
          f (first (first args))))
 
-(defn page
+(defn- page
   "Creates a page definition, via a function that is called with all
   page params of the route (if any) and an optional map of query
   params, and which must return an element representing that page."
   [f]
   (p/page (c/partial reacl-page f)))
 
+(defn- lift-pages-map [pages]
+  ;; this adds the 'reacl' wrapper, and allows to put ordinary functions into the map.
+  (into {} (map (fn [[r p]]
+                  [r (page p)])
+                pages)))
+
 (defn ^:no-doc history-router
   "For testing with a mocked history implementation."
   [history-impl pages]
-  (browser/lift reacl-basics.pages.router/history-router history-impl pages))
+  (browser/lift reacl-basics.pages.router/history-router history-impl (lift-pages-map pages)))
 
 (defn html5-history-router
   "An element that renders to one of the pages from the given map of
@@ -39,7 +45,7 @@
   monitored for changes. It also handles [[goto]] actions emitted from
   within, modifying the browser history accordingly."
   [pages]
-  (browser/lift p/html5-history-router pages))
+  (browser/lift p/html5-history-router (lift-pages-map pages)))
 
 (defn goto
   "Returns an action to go to the given path."
