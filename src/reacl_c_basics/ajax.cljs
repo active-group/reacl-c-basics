@@ -18,6 +18,8 @@
    value response-value
    request response-request])
 
+(def ^:no-doc empty-response (Response. true nil nil))
+
 (defn ^:no-doc request [f uri & [options]]
   (check-options-invariants! options)
   (Request. f uri options))
@@ -68,32 +70,25 @@
       (c/fragment)
       (fetch-once req handler))))
 
-(c/def-dynamic ^:no-doc throw-on-error response
+(defn throw-response-error [response]
   (let [error (response-value response)
         req (response-request response)]
     (throw (ex-info (str "Ajax request to " (:uri req) " failed.") {:type ::error :request req :error error}))))
 
-(c/defn-dynamic ^:no-doc show-response response [e-ok & [e-error]]
-  (if (response-ok? response)
-    e-ok
-    (or e-error throw-on-error)))
+(c/defn-dynamic show-response-value state
+  [lens f-ok & [f-error]]
+  (let [resp (lens/yank state lens)]
+    (if (response-ok? resp)
+      (f-ok (response-value resp))
+      (if f-error
+        (f-error (response-value resp))
+        (throw-response-error resp)))))
 
-(defn show-response-value
-  "Returns an element showing the state of an Ajax response, with
-  alternative elements for ok and error states. The error part
-  defaults to an element that throws an ex-info error
-  with `:type :reacl-c-basics.ajax/error`."
-  [e-ok & [e-error]]
-  (let [e-ok (c/focus e-ok response-value)
-        e-error (when e-error
-                  (c/focus e-error response-value))]
-    (show-response e-ok e-error)))
-
-(c/defn-dynamic maybe-show-response-value response
-  [e-pending e-ok & [e-error]]
-  (if (some? response)
-    (show-response-value e-ok e-error)
-    e-pending))
+(c/defn-dynamic maybe-show-response-value state
+  [lens e-pending f-ok & [f-error]]
+  (if (nil? (lens/yank state lens))
+    e-pending
+    (show-response-value lens f-ok f-error)))
 
 ;; delivering data to server ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
