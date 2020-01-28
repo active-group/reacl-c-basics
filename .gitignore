@@ -1,2 +1,4 @@
 target/
 .rebel_readline_history
+pom.xml
+pom.xml.asc
