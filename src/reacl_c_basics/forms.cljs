@@ -23,16 +23,16 @@
 (defn- value-state [e]
   (c/return :state (.. e -target -value)))
 
-(c/defn-dynamic ^:private input-value value [f & args]
+(c/defn-dynamic ^:private input-value value [f fixed-attrs & args]
   (let [[attrs children] (core/split-dom-attrs args)]
-    (apply f (merge {:type "text"
-                     :value value
+    (apply f (merge fixed-attrs
+                    {:value value
                      :onchange value-state}
                     attrs)
            children)))
 
 (defn input-string [& args]
-  (apply input-value dom/input args))
+  (apply input-value dom/input {:type "text"} args))
 
 (defn- input-parsed-lens
   ([parse restrict unparse [value {text :text pub-value :pub}]]
@@ -110,10 +110,31 @@
            content)))
 
 (defn textarea [& args]
-  (apply input-value dom/textarea args))
+  (apply input-value dom/textarea {} args))
+
+;; select and options, extended to work with arbitrary clojure values.
+(defn- pr-str-lens
+  ([values v] (pr-str v))
+  ([values p s] (if-let [l (not-empty (filter #(= s (pr-str %)) values))]
+                  (first l)
+                  ;; selected value not in list? keep previous
+                  p)))
 
 (defn select [& args]
-  (apply input-value dom/select args))
+  (let [[attrs options] (core/split-dom-attrs args)
+        values (map (fn [opt]
+                      ;; TODO: add dom/element-attrs, element-type or something? as a lens?
+                      (assert (= "option" (:type opt)))
+                      (:value (:attrs opt)))
+                    options)
+        _ (assert (= (count values) (count (set (map pr-str values)))) "Two or more options have the same 'pr-str' representation.")
+        options_ (map (fn [opt] (update-in opt [:attrs :value] pr-str))
+                      options)]
+    (-> (apply input-value dom/select {} (cons attrs options_))
+        (c/focus (c/partial pr-str-lens values)))))
+
+(defn option [& args]
+  (apply dom/option args))
 
 (core/defn-dom submit-button [attrs & content]
   (apply dom/button (merge {:type "submit"} attrs)
