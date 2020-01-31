@@ -1,4 +1,5 @@
 ^{:auto-testing true
   :extra-main-files {}
+  :open-url "http://[[server-hostname]]:[[server-port]]/figwheel-extra-main/auto-testing"
   :watch-dirs ["src" "test" #_"examples"]}
 {:main reacl-c-basics.test.runner}

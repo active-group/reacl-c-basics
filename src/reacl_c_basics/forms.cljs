@@ -51,10 +51,10 @@
   ;; (unparse state) => string
   ;; (parse string) => value
   ;; (restrict string) => string, preventing some input while typing.
-  (c/local-state (-> (apply input-string args)
-                     (c/focus (c/partial input-parsed-lens parse restrict unparse)))
-                 {:text (unparse value)
-                  :pub value}))
+  (c/local-state {:text (unparse value)
+                  :pub value}
+                 (c/focus (c/partial input-parsed-lens parse restrict unparse)
+                          (apply input-string args))))
 
 (defn- parse-number [s]
   ;; Note: "" parses as NaN although it's not isNaN; parseFloat ignores trailing extra chars; but isNaN does not:
@@ -130,8 +130,8 @@
         _ (assert (= (count values) (count (set (map pr-str values)))) "Two or more options have the same 'pr-str' representation.")
         options_ (map (fn [opt] (update-in opt [:attrs :value] pr-str))
                       options)]
-    (-> (apply input-value dom/select {} (cons attrs options_))
-        (c/focus (c/partial pr-str-lens values)))))
+    (c/focus (c/partial pr-str-lens values)
+             (apply input-value dom/select {} (cons attrs options_)))))
 
 (defn option [& args]
   (apply dom/option args))

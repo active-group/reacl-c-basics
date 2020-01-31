@@ -8,8 +8,7 @@
 (deftest form-test
   (let [e (tu/env (forms/form {:default {:text ""}
                                :onsubmit (fn [value] (c/return :action [:submit! value]))}
-                              (-> (forms/input-string)
-                                  (c/focus :text))))]
+                              (c/focus :text (forms/input-string))))]
     (tu/mount! e {:text "abc"})
 
     ;; reset to default works

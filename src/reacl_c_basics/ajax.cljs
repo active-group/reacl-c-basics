@@ -118,8 +118,8 @@
                                          (into (empty queue) (remove #(and (completed? %)
                                                                            (response-ok? (:response %)))
                                                                      queue))))))]
-  (defn ^:no-doc delivery-queue-auto-cleanup [e lens]
-    (c/capture-state-change e (c/partial h lens))))
+  (defn ^:no-doc delivery-queue-auto-cleanup [item lens]
+    (c/capture-state-change item (c/partial h lens))))
 
 (let [handler (fn [state lens a]
                 (if (instance? DeliveryJob a)
@@ -153,7 +153,7 @@
 (c/def-dynamic ^:private delivery-queue-executor queue
   (apply c/fragment
          (map (fn [job]
-                (-> (c/focus execute-job (JobLens. (:id job)))
+                (-> (c/focus (JobLens. (:id job)) execute-job)
                     ;; Note: I think we depend on a key, so that jobs are not 'remounted'='restarted' when the queue changes :-/
                     ;; Could only change that by not using a subscription, I think.
                     (c/keyed (:id job))))
@@ -170,7 +170,7 @@
   from the queue automaticall."
   [e lens & [options]]
   (cond-> (c/fragment (delivery-queue-handler e lens) ;; adds delivery actions to the queue
-                      (c/focus delivery-queue-executor lens) ;; drives executing and waiting for a response
+                      (c/focus lens delivery-queue-executor) ;; drives executing and waiting for a response
                       )
     (:auto-cleanup? options) (delivery-queue-auto-cleanup lens) ;; removes successfully completed jobs when new state bubbles up
     ))

@@ -84,8 +84,8 @@
 
         resp (#'ajax/make-response true :value req)
 
-        prog (-> (dom/div)
-                 (c/named "program")) 
+        program (c/name-id "program")
+        prog (c/named program (dom/div)) 
         
         mk-env (fn [& [options]] (tu/env (ajax/delivery-queue prog :queue options)))]
     (testing "starts running an action"
@@ -93,7 +93,7 @@
         (tu/provided [ajax/execute (execute-dummy nil)]
                      (tu/mount! env {:queue []})
                      (is (= (c/return :state {:queue [(assoc job :status :pending)]})
-                            (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** "program"))
+                            (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** program))
                                                job)))
                      (is (= (c/return :state {:queue [(assoc job :status :running)]})
                             (tu/update! env {:queue [(assoc job :status :pending)]})))))
@@ -105,7 +105,7 @@
                      (tu/mount! env {:queue []})
                      ;; Note: job = (async/deliver req), but not with an unknown id.
                      (is (= (c/return :state {:queue [(assoc job :status :pending)]})
-                            (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** "program"))
+                            (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** program))
                                                job)))
                      (is (= (c/return :state {:queue [(assoc job :status :completed :response resp)]})
                             (tu/update! env {:queue [(assoc job :status :pending)]})))))
@@ -115,7 +115,7 @@
         (tu/provided [ajax/execute (execute-dummy resp)]
                      ;; Note: it completes immediately, because of our fetch-once-dummy
                      (tu/mount! env {:queue []})
-                     (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** "program"))
+                     (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** program))
                                         job)
                      (is (= (c/return :state {:queue []})
                             (tu/update! env {:queue [(assoc job :status :pending)]}))))))))
