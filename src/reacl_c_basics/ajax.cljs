@@ -65,30 +65,33 @@
 (let [handler (fn [response]
                 (assert (response? response))
                 (c/return :state response))]
-  (c/defn-dynamic fetch response [req]
-    (if (some? response)
-      (c/fragment)
-      (fetch-once req handler))))
+  (c/defn-dynamic fetch "Returns an invisible element, that will
+  execute the given request whenever its state is or becomes nil, and
+  set its state to the success or error response as soon as
+  available."
+    response [req]
+  (if (some? response)
+    (c/fragment)
+    (fetch-once req handler))))
 
 (defn throw-response-error [response]
   (let [error (response-value response)
         req (response-request response)]
     (throw (ex-info (str "Ajax request to " (:uri req) " failed.") {:type ::error :request req :error error}))))
 
-(c/defn-dynamic show-response-value state
-  [lens f-ok & [f-error]]
-  (let [resp (lens/yank state lens)]
-    (if (response-ok? resp)
-      (f-ok (response-value resp))
-      (if f-error
-        (f-error (response-value resp))
-        (throw-response-error resp)))))
+(defn show-response-value
+  [resp f-ok & [f-error]]
+  (if (response-ok? resp)
+    (f-ok (response-value resp))
+    (if f-error
+      (f-error (response-value resp))
+      (throw-response-error resp))))
 
-(c/defn-dynamic maybe-show-response-value state
-  [lens e-pending f-ok & [f-error]]
-  (if (nil? (lens/yank state lens))
+(defn maybe-show-response-value
+  [resp e-pending f-ok & [f-error]]
+  (if (nil? resp)
     e-pending
-    (show-response-value lens f-ok f-error)))
+    (show-response-value resp f-ok f-error)))
 
 ;; delivering data to server ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
