@@ -5,8 +5,6 @@
             [active.clojure.lens :as lens :include-macros true]
             [ajax.core :as ajax]))
 
-;; TODO: rename element -> item
-
 (defn check-options-invariants! [options]
   (assert (not (:handler options)))
   (assert (not (:error-handler options))))
@@ -56,7 +54,7 @@
 ;; fetching data from server ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn fetch-once
-    "Returns an invisible element, that will execute the given Ajax
+    "Returns an invisible item, that will execute the given Ajax
   request once, when mounted. When the request completes with an error
   or success, then `(f response)` is evaluated, which
   must return a [[reacl-c.core/return]] value."
@@ -67,7 +65,7 @@
 (let [handler (fn [response]
                 (assert (response? response))
                 (c/return :state response))]
-  (c/defn-dynamic fetch "Returns an invisible element, that will
+  (c/defn-dynamic fetch "Returns an invisible item, that will
   execute the given request whenever its state is or becomes nil, and
   set its state to the success or error response as soon as
   available."
@@ -167,7 +165,7 @@
               (filter #(not (completed? %)) queue))))
 
 (defn delivery-queue
-  "Returns an element that manages a sequence of Ajax requests in its
+  "Returns an item that manages a sequence of Ajax requests in its
   state, under the given `lens`. You can add [[delivery-job]] values
   to it, or use [[deliver]] to get an action that can be emitted by
   `e`. Jobs in the :pending state are executed in parallel,
@@ -185,7 +183,7 @@
 
 (defn deliver
   "Returns an action to add the given request to the end of the next
-  queue [[delivery-queue]] up in the element tree. An arbitrary `info`
+  queue [[delivery-queue]] up in the item tree. An arbitrary `info`
   value can be attached, identifying or describing the request."
   [req & [info]]
   ;; actions same as the jobs

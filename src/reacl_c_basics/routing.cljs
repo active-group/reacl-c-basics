@@ -24,7 +24,7 @@
 (defn- page
   "Creates a page definition, via a function that is called with all
   page params of the route (if any) and an optional map of query
-  params, and which must return an element representing that page."
+  params, and which must return an item representing that page."
   [f]
   (p/page (c/partial reacl-page f)))
 
@@ -40,7 +40,7 @@
   (browser/lift reacl-basics.pages.router/history-router history-impl (lift-pages-map pages)))
 
 (defn html5-history-router
-  "An element that renders to one of the pages from the given map of
+  "An item that renders to one of the pages from the given map of
   routes to pages, depending on the current browser location, which is
   monitored for changes. It also handles [[goto]] actions emitted from
   within, modifying the browser history accordingly."
