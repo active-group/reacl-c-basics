@@ -11,7 +11,7 @@
                  [de.active-group/active-clojure "0.33.0"]
                  [de.active-group/reacl-c "0.3.0"]
                  [reacl "2.2.0"]
-                 [de.active-group/reacl-basics "0.1.0"]
+                 [de.active-group/reacl-basics "0.1.1"]
                  [cljs-ajax "0.7.5"]]
 
   :plugins [[lein-codox "0.10.7"]
