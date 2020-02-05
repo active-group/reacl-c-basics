@@ -5,6 +5,8 @@
             [active.clojure.lens :as lens :include-macros true]
             [ajax.core :as ajax]))
 
+;; TODO: rename element -> item
+
 (defn check-options-invariants! [options]
   (assert (not (:handler options)))
   (assert (not (:error-handler options))))
@@ -115,6 +117,7 @@
 
 ;; TODO: not sure if this a good idea; maybe a timed cleanup is better?
 (let [h (fn [lens old new]
+          ;; FIXME: use focus, or lift-lens (for index lenses)
           (c/return :state (lens/shove new
                                        lens
                                        (let [queue (lens/yank new lens)]
@@ -126,6 +129,7 @@
 
 (let [handler (fn [state lens a]
                 (if (instance? DeliveryJob a)
+                  ;; FIXME: use focus, or lift-lens (for index lenses)
                   (let [queue (lens/yank state lens)]
                     (c/return :state (lens/shove state lens (into (empty queue) (concat queue (list a))))))
                   (c/return :action a)))]
