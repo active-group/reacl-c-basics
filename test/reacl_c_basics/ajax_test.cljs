@@ -20,6 +20,13 @@
                                 ((:error-handler options) response)))
                             0))))
 
+(defn maybe-execute-effects! [env ret]
+  ;; TODO: should not require internals of reacl-c
+  ;; TODO: maybe an :execute-effects? option to 'tu/env' (with a replacement handler?)
+  (doseq [a (filter reacl-c.base/effect? (:actions ret))]
+    ;; Note: generally, could return new 'returns'
+    (tu/execute-effect! env a)))
+
 (deftest fetch-once-start-test
   (async done
          (let [started (atom false)
@@ -29,7 +36,7 @@
                                                 (done)
                                                 (c/return))))]
              (is (not @started))
-             (tu/mount! env nil)
+             (maybe-execute-effects! env (tu/mount! env nil))
              (is @started)))))
 
 (deftest fetch-once-ok-test
@@ -41,7 +48,7 @@
                                                 (is (= ::value (ajax/response-value response)))
                                                 (done)
                                                 (c/return))))]
-             (tu/mount! env nil)))))
+             (maybe-execute-effects! env (tu/mount! env nil))))))
 
 (deftest fetch-once-failure-test
   (async done
@@ -52,7 +59,7 @@
                                                 (is (= {:v ::error} (ajax/response-value response)))
                                                 (done)
                                                 (c/return))))]
-             (tu/mount! env nil)))))
+             (maybe-execute-effects! env (tu/mount! env nil))))))
 
 (defn execute-dummy [result]
   (let [a (c/return :action result)

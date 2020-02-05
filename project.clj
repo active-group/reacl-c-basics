@@ -9,7 +9,7 @@
   :dependencies [[org.clojure/clojure "1.9.0" :scope "provided"]
                  [org.clojure/clojurescript "1.10.238" :scope "provided"]
                  [de.active-group/active-clojure "0.33.0"]
-                 [de.active-group/reacl-c "0.3.0"]
+                 [de.active-group/reacl-c "0.4.0"]
                  [reacl "2.2.0"]
                  [de.active-group/reacl-basics "0.1.1"]
                  [cljs-ajax "0.7.5"]]
