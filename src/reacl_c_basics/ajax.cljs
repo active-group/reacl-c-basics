@@ -11,7 +11,7 @@
 
 (defrecord ^:private Request [f uri options])
 
-(r/define-record-type ^:private Response
+(r/define-record-type Response
   (make-response ok? value request)
   response?
   [ok? response-ok?
