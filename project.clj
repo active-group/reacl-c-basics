@@ -1,4 +1,4 @@
-(defproject de.active-group/reacl-c-basics "0.2.1-SNAPSHOT"
+(defproject de.active-group/reacl-c-basics "0.2.1"
   :description "Library with utilities often useful when writing web applications with Reacl-C."
   
   :url "http://github.com/active-group/reacl-c-basics"
@@ -11,7 +11,7 @@
                  [de.active-group/active-clojure "0.33.0"]
                  [de.active-group/reacl-c "0.4.0"]
                  [reacl "2.2.0"]
-                 [de.active-group/reacl-basics "0.1.1"]
+                 [de.active-group/reacl-basics "0.1.2"]
                  [cljs-ajax "0.7.5"]]
 
   :plugins [[lein-codox "0.10.7"]
