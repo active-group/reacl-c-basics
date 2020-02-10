@@ -113,17 +113,24 @@
   [req & [info]]
   (make-delivery-job (gensym "delivery-job") req info :pending nil))
 
-;; TODO: not sure if this a good idea; maybe a timed cleanup is better?
-(let [h (fn [lens old new]
-          ;; FIXME: use focus, or lift-lens (for index lenses)
-          (c/return :state (lens/shove new
-                                       lens
-                                       (let [queue (lens/yank new lens)]
-                                         (into (empty queue) (remove #(and (completed? %)
-                                                                           (response-ok? (:response %)))
-                                                                     queue))))))]
-  (defn ^:no-doc delivery-queue-auto-cleanup [item lens]
-    (c/capture-state-change item (c/partial h lens))))
+(defn- cleaned-up-lens
+  ([queue]
+   (not (some completed? queue)))
+  ([queue cleaned-up?]
+   (if cleaned-up?
+     (remove completed? queue)
+     queue)))
+
+(def ^:private
+  delivery-queue-auto-cleanup
+  (c/focus cleaned-up-lens
+           (c/dynamic (fn [cleaned-up?]
+                        ;; Note: it might be dangerous to do this with
+                        ;; a 'once'; if it interferes with other state
+                        ;; updates, then make it asynchronous.
+                        (if (not cleaned-up?)
+                          (c/once (c/return :state true))
+                          c/empty)))))
 
 (let [handler (fn [state lens a]
                 (if (instance? DeliveryJob a)
@@ -134,14 +141,15 @@
   (c/defn-dynamic ^:no-doc delivery-queue-handler state [e lens]
     (c/handle-action e (c/partial handler state lens))))
 
-(c/def-dynamic ^:private execute-job job
-  (c/fragment (c/did-mount (c/return :state (update job :status #(if (= :pending %) :running %))))
-              (fetch-once (:req job)
-                          (fn [a]
-                            (assert (response? a))
-                            (c/return :state (assoc job
-                                                    :status :completed
-                                                    :response a))))))
+(let [h (fn [job a]
+          (assert (response? a))
+          (c/return :state (assoc job
+                                  :status :completed
+                                  :response a)))]
+  (c/def-dynamic ^:private execute-job job
+    (c/fragment (c/once (c/return :state (update job :status #(if (= :pending %) :running %))))
+                (fetch-once (:req job)
+                            (c/partial h job)))))
 
 (defrecord ^:private JobLens [id]
   IFn
@@ -155,7 +163,7 @@
                    job))
                queue))))
 
-(c/def-dynamic ^:private delivery-queue-executor queue
+(c/def-dynamic ^:private delivery-queue-parallel-executor queue
   (apply c/fragment
          (map (fn [job]
                 (-> (c/focus (JobLens. (:id job)) execute-job)
@@ -164,22 +172,43 @@
                     (c/keyed (:id job))))
               (filter #(not (completed? %)) queue))))
 
+(c/def-dynamic ^:private delivery-queue-sequential-executor queue
+  (if-let [job (first (filter #(not (completed? %)) queue))]
+    (c/focus (JobLens. (:id job)) execute-job)
+    c/empty))
+
 (defn delivery-queue
   "Returns an item that manages a sequence of Ajax requests in its
   state, under the given `lens`. You can add [[delivery-job]] values
   to it, or use [[deliver]] to get an action that can be emitted by
-  `e`. Jobs in the :pending state are executed in parallel,
-  transitioning into the :running state, and end in the :completed
-  state (irrespective of success or failure). When `(:auto-cleanup?
-  options)` is true, sucessfully completed jobs are eventually removed
-  from the queue automaticall."
-  [e lens & [options]]
-  (cond-> (c/fragment (delivery-queue-handler e lens) ;; adds delivery actions to the queue
-                      (c/focus lens delivery-queue-executor) ;; drives executing and waiting for a response
-                      )
-    (:auto-cleanup? options) (delivery-queue-auto-cleanup lens) ;; removes successfully completed jobs when new state bubbles up
-    ))
+  `e` and adds jobs to the end of the queue.
 
+  Jobs transition from a :pending state, over :running
+  into :completed (successful or not).  When `(:auto-cleanup?
+  options)` is true, sucessfully completed jobs are eventually removed
+  from the queue automatically. When `(:parallel? options)` is true,
+  then not only the first non-completed job is executed, but all are
+  started in parallel (though the browser might actually only run 2 at
+  the same time)."
+  [e lens & [options]]
+  ;; TODO: auto-cleanup as default?
+  (c/fragment (delivery-queue-handler e lens) ;; adds delivery actions to the queue
+              (c/focus lens
+                       (c/fragment
+                        ;; drives executing and waiting for a response
+                        (if (:parallel? options) delivery-queue-parallel-executor delivery-queue-sequential-executor)
+                        ;; removes completed jobs.
+                        (if (:auto-cleanup? options) delivery-queue-auto-cleanup c/empty)))))
+
+(defn hidden-delivery-queue
+  "Like [[delivery-queue]], but with a hidden queue in local state."
+  [e & [options]]
+  ;; TOOD: add a fn that can translate it into user state?
+  (c/local-state []
+                 (delivery-queue (c/focus c/first-lens e)
+                                 c/second-lens
+                                 (assoc options
+                                        :auto-cleanup? true))))
 
 (defn deliver
   "Returns an action to add the given request to the end of the next

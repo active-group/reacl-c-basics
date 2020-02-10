@@ -68,7 +68,7 @@
     (fn [req f & args]
       ;; if result = nil, it never completes; otherwise immediately on mount.
       (if (some? result)
-        (c/did-mount a)
+        (c/once a)
         (c/fragment)))))
 
 (deftest fetch-test
@@ -122,7 +122,17 @@
         (tu/provided [ajax/execute (execute-dummy resp)]
                      ;; Note: it completes immediately, because of our fetch-once-dummy
                      (tu/mount! env {:queue []})
-                     (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** program))
-                                        job)
-                     (is (= (c/return :state {:queue []})
-                            (tu/update! env {:queue [(assoc job :status :pending)]}))))))))
+                     (let [r (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** program))
+                                                job)]
+                       (is (= (c/return :state {:queue [(assoc job :status :pending)]})
+                              r))
+                       (is (= (c/return :state {:queue []})
+                              (tu/push!! env r))))))
+      (let [env (mk-env {:auto-cleanup? false})]
+        (tu/provided [ajax/execute (execute-dummy resp)]
+                     (tu/mount! env {:queue []})
+                     (is (= (c/return :state {:queue [(assoc job
+                                                             :status :completed
+                                                             :response resp)]})
+                            (tu/push!! env (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** program))
+                                                              job)))))))))
