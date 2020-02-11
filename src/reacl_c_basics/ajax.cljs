@@ -1,6 +1,7 @@
 (ns reacl-c-basics.ajax
   (:require [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom]
+            [reacl-c.test-util.core :as tu]
             [active.clojure.cljs.record :as r :include-macros true]
             [active.clojure.lens :as lens :include-macros true]
             [ajax.core :as ajax]))
@@ -46,10 +47,15 @@
                          (handler (make-response false error request)))))]
     (f uri nopts)))
 
-(c/defn-subscription ^:private execute deliver! [request]
+(c/defn-subscription execute deliver! [request]
   (let [id (execute-request! request deliver!)]
     (fn []
       (ajax/abort id))))
+
+(defn request-effect?
+  "Returns if the given effect action performs the given request."
+  [eff request]
+  (tu/subscribe-effect? eff (execute request)))
 
 ;; fetching data from server ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
