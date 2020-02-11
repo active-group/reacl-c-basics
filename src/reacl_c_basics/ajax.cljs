@@ -10,20 +10,23 @@
   (assert (not (:handler options)))
   (assert (not (:error-handler options))))
 
-(defrecord ^:private Request [f uri options])
+(r/define-record-type ^:private Request (make-request f uri options)
+  request?
+  [f request-f
+   uri request-uri
+   options request-options])
 
 (r/define-record-type Response
-  (make-response ok? value request)
+  (make-response ok? value)
   response?
   [ok? response-ok?
-   value response-value
-   request response-request])
+   value response-value])
 
-(def ^:no-doc empty-response (Response. true nil nil))
+(def ^:no-doc empty-response (make-response true nil))
 
 (defn ^:no-doc request [f uri & [options]]
   (check-options-invariants! options)
-  (Request. f uri options))
+  (make-request f uri options))
 
 (defn GET [uri & [options]] (request ajax/GET uri options))
 (defn HEAD [uri & [options]] (request ajax/HEAD uri options))
@@ -40,11 +43,11 @@
         nopts (assoc options
                      :handler
                      (fn [response]
-                       (handler (make-response true response request)))
+                       (handler (make-response true response)))
                      :error-handler
                      (fn [error]
                        (when (not= :aborted (:failure error))
-                         (handler (make-response false error request)))))]
+                         (handler (make-response false error)))))]
     (f uri nopts)))
 
 (c/defn-subscription execute deliver! [request]
@@ -52,10 +55,71 @@
     (fn []
       (ajax/abort id))))
 
-(defn request-effect?
-  "Returns if the given effect action performs the given request."
-  [eff request]
-  (tu/subscribe-effect? eff (execute request)))
+;; test utils ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn ok-response [result]
+  (make-response true result))
+
+(defn error-response [status & [body]]
+  (make-response false {:status status :body body}))
+
+(defn request-subscribe-effect?
+  "Returns if the given effect action performs the subscription to the result of the given request."
+  [eff & [request]]
+  (if request
+    ;; with a concrete requests
+    (tu/subscribe-effect? eff (execute request))
+    ;; or generally, a request should be at a certain position of the subscription-effect args
+    (and (tu/subscribe-effect? eff)
+         (let [[req] (tu/subscribe-effect-args eff)]
+           (request? req)))))
+
+(defn request-unsubscribe-effect?
+  "Returns if the given effect action performs the unsubscription from the result of the given request."
+  [eff]
+  (and (tu/unsubscribe-effect? eff)
+       (let [[req] (tu/unsubscribe-effect-args eff)]
+         (request? req))))
+
+(defn request-subscribe-effect-request
+  [eff]
+  ;; Note: only for the subscription effect (not the unsubscription)
+  (assert (request-subscribe-effect? eff))
+  (first (tu/subscribe-effect-args eff)))
+
+(defn request-unsubscribe-effect-request
+  [eff]
+  ;; Note: only for the subscription effect (not the unsubscription)
+  (assert (request-unsubscribe-effect? eff))
+  (first (tu/unsubscribe-effect-args eff)))
+
+(defn requests-emulator
+  "Returns an effect reducer, that calls f for all ajax requests that
+  are subscribed to in a test environment, and if f returns a
+  response, then makes it an action emitted from the corresponding
+  subscription item. Otherwise it is passed on."
+  [f]
+  (fn [env eff]
+    (cond
+      (request-subscribe-effect? eff)
+      (let [req (request-subscribe-effect-request eff)]
+        (if-let [resp (f req)]
+          ;; TODO: merge-returned should be in core or tu
+          (reacl-c.base/merge-returned (tu/subscription-start-return env eff)
+                                       (tu/subscription-result-return env eff resp))
+          (c/return :action eff)))
+      
+      (request-unsubscribe-effect? eff)
+      (let [req (request-unsubscribe-effect-request eff)]
+        ;; is it one of the requests we emulate here? Then drop
+        ;; it (it's a noop anyway - no stop! fn passed to
+        ;; subscription-start-return)
+        (if (some? (f req))
+          (c/return)
+          (c/return :action eff)))
+      
+      :else
+      (c/return :action eff))))
 
 ;; fetching data from server ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -81,9 +145,8 @@
     (fetch-once req handler))))
 
 (defn throw-response-error [response]
-  (let [error (response-value response)
-        req (response-request response)]
-    (throw (ex-info (str "Ajax request to " (:uri req) " failed.") {:type ::error :request req :error error}))))
+  (let [error (response-value response)]
+    (throw (ex-info (str "Ajax request failed: " (pr-str error)) {:type ::error :error error}))))
 
 (defn show-response-value
   [resp f-ok & [f-error]]

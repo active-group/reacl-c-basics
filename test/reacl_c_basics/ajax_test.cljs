@@ -73,7 +73,7 @@
 
 (deftest fetch-test
   ;; fetch puts the response into a slot in the state.
-  (let [resp (#'ajax/make-response true :value :req)
+  (let [resp (ajax/ok-response :value :req)
         env (tu/env (ajax/fetch (ajax/GET "/url")))]
     (tu/provided [ajax/execute (execute-dummy resp)]
                  ;; fetch when state nil
@@ -85,11 +85,15 @@
 
 ;; TODO show-response-value ?
 
+(deftest request-equality-test
+  (is (= (ajax/GET "/url") (ajax/GET "/url")))
+  )
+
 (deftest delivery-queue-test
   (let [req  (ajax/GET "/url")
         job (ajax/delivery-job req :info)
 
-        resp (#'ajax/make-response true :value req)
+        resp (ajax/ok-response :value req)
 
         program (c/name-id "program")
         prog (c/named program (dom/div)) 
@@ -136,3 +140,20 @@
                                                              :response resp)]})
                             (tu/push!! env (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** program))
                                                               job)))))))))
+
+(deftest emulator-test
+  (let [req1 (ajax/GET "http://invalid.invalid/url")
+        ok-res (ajax/ok-response :result)
+        env (tu/env (c/dynamic #(if % (ajax/execute req1) c/empty))
+                    {:emulator
+                     (ajax/requests-emulator {req1 ok-res})})]
+
+    (is (= (c/return :action ok-res)
+           (tu/mount! env true)))
+
+    (is (= (c/return)
+           (tu/update!! env false)))
+
+    (tu/mount! env true)
+    (is (= (c/return)
+           (tu/unmount! env)))))
