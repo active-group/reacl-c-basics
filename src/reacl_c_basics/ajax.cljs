@@ -126,13 +126,13 @@
 (defn fetch-once
     "Returns an invisible item, that will execute the given Ajax
   request once, when mounted. When the request completes with an error
-  or success, then `(f response)` is evaluated, which
+  or success, then `(f state response)` is evaluated, which
   must return a [[reacl-c.core/return]] value."
     [req f]
     (-> (execute req)
         (c/handle-action f)))
 
-(let [handler (fn [response]
+(let [handler (fn [_ response]
                 (assert (response? response))
                 (c/return :state response))]
   (c/defn-dynamic fetch "Returns an invisible item, that will
@@ -198,27 +198,29 @@
                         ;; a 'once'; if it interferes with other state
                         ;; updates, then make it asynchronous.
                         (if (not cleaned-up?)
-                          (c/once (c/return :state true))
+                          (c/once (c/constantly (c/return :state true)))
                           c/empty)))))
 
-(let [handler (fn [state lens a]
+(let [handler (fn [lens state a]
                 (if (instance? DeliveryJob a)
                   ;; FIXME: use focus, or lift-lens (for index lenses)
                   (let [queue (lens/yank state lens)]
                     (c/return :state (lens/shove state lens (into (empty queue) (concat queue (list a))))))
                   (c/return :action a)))]
-  (c/defn-dynamic ^:no-doc delivery-queue-handler state [e lens]
-    (c/handle-action e (c/partial handler state lens))))
+  (defn ^:no-doc delivery-queue-handler [e lens]
+    (c/handle-action e (c/partial handler lens))))
 
-(let [h (fn [job a]
-          (assert (response? a))
-          (c/return :state (assoc job
-                                  :status :completed
-                                  :response a)))]
+(let [fetch-h (fn [job a]
+                (assert (response? a))
+                (c/return :state (assoc job
+                                        :status :completed
+                                        :response a)))
+      running-h (fn [job]
+                  (c/return :state (update job :status #(if (= :pending %) :running %))))]
   (c/def-dynamic ^:private execute-job job
-    (c/fragment (c/once (c/return :state (update job :status #(if (= :pending %) :running %))))
+    (c/fragment (c/once running-h)
                 (fetch-once (:req job)
-                            (c/partial h job)))))
+                            fetch-h))))
 
 (defrecord ^:private JobLens [id]
   IFn

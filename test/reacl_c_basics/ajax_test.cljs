@@ -32,7 +32,7 @@
          (let [started (atom false)
                dummy (dummy-ajax started [true ::value])]
            (let [env (tu/env (ajax/fetch-once (ajax/request dummy "uri")
-                                              (fn [_]
+                                              (fn [_ _]
                                                 (done)
                                                 (c/return))))]
              (is (not @started))
@@ -43,7 +43,7 @@
   (async done
          (let [dummy (dummy-ajax nil [true ::value])]
            (let [env (tu/env (ajax/fetch-once (ajax/request dummy "uri")
-                                              (fn [response]
+                                              (fn [state response]
                                                 (is (ajax/response-ok? response))
                                                 (is (= ::value (ajax/response-value response)))
                                                 (done)
@@ -54,7 +54,7 @@
   (async done
          (let [dummy (dummy-ajax nil [false {:v ::error}])]
            (let [env (tu/env (ajax/fetch-once (ajax/request dummy "uri")
-                                              (fn [response]
+                                              (fn [state response]
                                                 (is (not (ajax/response-ok? response)))
                                                 (is (= {:v ::error} (ajax/response-value response)))
                                                 (done)
@@ -62,13 +62,11 @@
              (maybe-execute-effects! env (tu/mount! env nil))))))
 
 (defn execute-dummy [result]
-  (let [a (c/return :action result)
-        h (fn [state _ f args]
-            (apply f state result args))]
+  (let [a (c/return :action result)]
     (fn [req f & args]
       ;; if result = nil, it never completes; otherwise immediately on mount.
       (if (some? result)
-        (c/once a)
+        (c/once (c/constantly a))
         (c/fragment)))))
 
 (deftest fetch-test

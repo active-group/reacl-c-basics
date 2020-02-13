@@ -3,7 +3,7 @@
             [reacl-c.dom :as dom]
             [reacl-c-basics.core :as core :include-macros true]))
 
-(defn- checked-state [e]
+(defn- checked-state [_ e]
   (c/return :state (.. e -target -checked)))
 
 (c/defn-dynamic checkbox checked [& args]
@@ -20,7 +20,7 @@
                            attrs)
            children)))
 
-(defn- value-state [e]
+(defn- value-state [_ e]
   (c/return :state (.. e -target -value)))
 
 (c/defn-dynamic ^:private input-value value [f fixed-attrs & args]
@@ -148,7 +148,7 @@
   (.preventDefault ev)
   (f value))
 
-(c/defn-dynamic form value [attrs & content]
+(c/defn-named form [attrs & content]
   ;; :onreset a (c/return) value, automatically added when a :default is set.
   ;; :onsubmit a (fn [value]) => (c/return).
   (apply dom/form
@@ -156,7 +156,7 @@
                           {:onreset (c/constantly (c/return :state default))})
                         attrs)
            true (dissoc :default)
-           (:onsubmit attrs) (assoc :onsubmit (c/partial submitter (:onsubmit attrs) value)))
+           (:onsubmit attrs) (assoc :onsubmit (c/partial submitter (:onsubmit attrs))))
          content))
 
 (c/defn-named local-form [& args]
