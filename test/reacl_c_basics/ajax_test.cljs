@@ -73,7 +73,7 @@
 
 (deftest fetch-test
   ;; fetch puts the response into a slot in the state.
-  (let [resp (ajax/ok-response :value :req)
+  (let [resp (ajax/ok-response :value)
         env (tu/env (ajax/fetch (ajax/GET "/url")))]
     (tu/provided [ajax/execute (execute-dummy resp)]
                  ;; fetch when state nil
@@ -93,7 +93,7 @@
   (let [req  (ajax/GET "/url")
         job (ajax/delivery-job req :info)
 
-        resp (ajax/ok-response :value req)
+        resp (ajax/ok-response :value)
 
         program (c/name-id "program")
         prog (c/named program (dom/div)) 
