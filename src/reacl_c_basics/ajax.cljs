@@ -114,11 +114,19 @@
 (defn- completed? [job]
   (= :completed (delivery-job-status job)))
 
-(defn delivery-job
+(defn delivery-job!
   "Returns a new delivery job, that you can put into the state backing
   up a [[delivery-queue]]."
   [req & [info]]
   (make-delivery-job (gensym "delivery-job") req info :pending nil))
+
+(defn deliver
+  "Returns an action to add the given request to the end of the next
+  queue [[delivery-queue]] up in the item tree. An arbitrary `info`
+  value can be attached, identifying or describing the request."
+  [req & [info]]
+  ;; the job is the action for simplicity; id will be added in the 'handler'
+  (make-delivery-job nil req info :pending nil))
 
 (defn- cleaned-up-lens
   ([queue]
@@ -140,9 +148,13 @@
                           c/empty)))))
 
 (let [handler (fn [lens state a]
-                (if (instance? DeliveryJob a)
+                (if (delivery-job? a)
                   ;; FIXME: use focus, or lift-lens (for index lenses)
-                  (let [queue (lens/yank state lens)]
+                  (let [queue (lens/yank state lens)
+                        ;; add job id, if not set yet
+                        a (if (nil? (delivery-job-id a))
+                            (lens/shove a delivery-job-id (gensym "delivery-job"))
+                            a)]
                     (c/return :state (lens/shove state lens (into (empty queue) (concat queue (list a))))))
                   (c/return :action a)))]
   (defn ^:no-doc delivery-queue-handler [e lens]
@@ -219,10 +231,3 @@
                                  (assoc options
                                         :auto-cleanup? true))))
 
-(defn deliver
-  "Returns an action to add the given request to the end of the next
-  queue [[delivery-queue]] up in the item tree. An arbitrary `info`
-  value can be attached, identifying or describing the request."
-  [req & [info]]
-  ;; actions same as the jobs
-  (delivery-job req info))

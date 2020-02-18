@@ -88,7 +88,7 @@
 
 (deftest delivery-queue-test
   (let [req  (ajax/GET "/url")
-        job (ajax/delivery-job req :info)
+        job (ajax/delivery-job! req :info)
 
         resp (ajax/ok-response :value)
 
