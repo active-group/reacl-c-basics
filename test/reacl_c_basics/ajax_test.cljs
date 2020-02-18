@@ -3,7 +3,6 @@
             [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom]
             [reacl-c.test-util.core :as tu :include-macros true]
-            [reacl-c.test-util.xpath :as xpath :include-macros true]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
 
 (defn after [ms thunk]
@@ -102,7 +101,7 @@
         (tu/provided [ajax/execute (execute-dummy nil)]
                      (tu/mount! env {:queue []})
                      (is (= (c/return :state {:queue [(assoc job :status :pending)]})
-                            (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** program))
+                            (tu/inject-action! (tu/find-named env program)
                                                job)))
                      (is (= (c/return :state {:queue [(assoc job :status :running)]})
                             (tu/update! env {:queue [(assoc job :status :pending)]})))))
@@ -114,7 +113,7 @@
                      (tu/mount! env {:queue []})
                      ;; Note: job = (async/deliver req), but not with an unknown id.
                      (is (= (c/return :state {:queue [(assoc job :status :pending)]})
-                            (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** program))
+                            (tu/inject-action! (tu/find-named env program)
                                                job)))
                      (is (= (c/return :state {:queue [(assoc job :status :completed :response resp)]})
                             (tu/update! env {:queue [(assoc job :status :pending)]})))))
@@ -124,7 +123,7 @@
         (tu/provided [ajax/execute (execute-dummy resp)]
                      ;; Note: it completes immediately, because of our fetch-once-dummy
                      (tu/mount! env {:queue []})
-                     (let [r (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** program))
+                     (let [r (tu/inject-action! (tu/find-named env program)
                                                 job)]
                        (is (= (c/return :state {:queue [(assoc job :status :pending)]})
                               r))
@@ -136,7 +135,7 @@
                      (is (= (c/return :state {:queue [(assoc job
                                                              :status :completed
                                                              :response resp)]})
-                            (tu/push!! env (tu/inject-action! (xpath/select-one (tu/get-component env) (xpath/>> ** program))
+                            (tu/push!! env (tu/inject-action! (tu/find-named env program)
                                                               job)))))))))
 
 

@@ -3,7 +3,6 @@
             [reacl-c.core :as c]
             [reacl-c.dom :as dom]
             [reacl-c.test-util.core :as tu :include-macros true]
-            [reacl-c.test-util.xpath :as xpath :include-macros true]
             [reacl-basics.pages.routes :as routes :include-macros true]
             [reacl-basics.pages.history :as history]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
@@ -44,8 +43,7 @@
                  env (tu/env main)
 
                  doms-with-tag (fn [tag]
-                                 (xpath/select-all (tu/get-component env)
-                                                   (xpath/>> ** tag)))
+                                 (tu/find-all env tag))
                  dom-content (fn [c]
                                (apply str (array-seq (.-children c))))]
 
@@ -53,13 +51,13 @@
 
              ;; "/home" initially, showing the homepage with the application state:
              (is (= ["Homepage state"]
-                    (map dom-content (doms-with-tag "div"))))
+                    (map dom-content (doms-with-tag (dom/div)))))
              
              ;; emulate a user click on an anchor to go to person page:
              (js/window.setTimeout
                 (fn []
                   (@hist-nav! "/person/123?a=42")
                   (is (= ["Person: 123 42"]
-                         (map dom-content (doms-with-tag "div"))))
+                         (map dom-content (doms-with-tag (dom/div)))))
                   (done))
                 0)))))

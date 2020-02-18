@@ -1,8 +1,8 @@
 (ns reacl-c-basics.forms-test
   (:require [reacl-c-basics.forms :as forms]
             [reacl-c.core :as c]
+            [reacl-c.dom :as dom]
             [reacl-c.test-util.core :as tu]
-            [reacl-c.test-util.xpath :as xpath :include-macros true]
             [cljs.test :refer (is deftest testing) :include-macros true]))
 
 (deftest form-test
@@ -13,19 +13,19 @@
 
     ;; reset to default works
     (is (= (c/return :state {:text ""})
-           (tu/invoke-callback! (xpath/select (tu/get-component e) (xpath/>> ** "form"))
+           (tu/invoke-callback! (tu/find e (dom/form))
                                 :onreset #js {:type "reset"})))
 
     ;; setting value
     (is (= (c/return :state {:text "foobar"})
-           (tu/invoke-callback! (xpath/select (tu/get-component e) (xpath/>> ** "input"))
+           (tu/invoke-callback! (tu/find e (dom/input))
                                 :onchange #js {:type "change"
                                                :target #js {:value "foobar"}})))
 
     ;; submitting
     (tu/update! e {:text "foobar"})
     (is (= (c/return :action [:submit! {:text "foobar"}])
-           (tu/invoke-callback! (xpath/select (tu/get-component e) (xpath/>> ** "form"))
+           (tu/invoke-callback! (tu/find e (dom/form))
                                 :onsubmit #js {:type "submit"
                                                :preventDefault (fn [] nil)}))))
 
@@ -35,8 +35,7 @@
   (let [e (tu/env (forms/input-number))
 
         current-input (fn []
-                        (-> (tu/get-component e)
-                            (xpath/select (xpath/>> ** "input"))))
+                        (tu/find e (dom/input)))
         current-text (fn []
                        (-> (current-input)
                            (.-props)
