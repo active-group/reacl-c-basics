@@ -81,17 +81,18 @@
     (c/fragment)
     (fetch-once req handler))))
 
-(defn throw-response-error [response]
-  (let [error (response-value response)]
-    (throw (ex-info (str "Ajax request failed: " (pr-str error)) {:type ::error :error error}))))
+(defn throw-response-error [error]
+  ;; error = {:status ...}
+  (throw (ex-info (str "Ajax request failed: " (pr-str error)) {:type ::error :error error})))
 
 (defn show-response-value
   [resp f-ok & [f-error]]
-  (if (response-ok? resp)
-    (f-ok (response-value resp))
-    (if f-error
-      (f-error (response-value resp))
-      (throw-response-error resp))))
+  (let [res-value (response-value resp)]
+    (if (response-ok? resp)
+      (f-ok res-value)
+      (if f-error
+        (f-error res-value)
+        (throw-response-error res-value)))))
 
 (defn maybe-show-response-value
   [resp e-pending f-ok & [f-error]]
