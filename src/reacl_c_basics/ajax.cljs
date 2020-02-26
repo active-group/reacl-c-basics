@@ -9,7 +9,7 @@
   (assert (not (:handler options)))
   (assert (not (:error-handler options))))
 
-(r/define-record-type ^:private Request (make-request f uri options)
+(r/define-record-type Request (make-request f uri options)
   request?
   [f request-f
    uri request-uri
