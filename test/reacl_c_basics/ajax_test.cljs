@@ -83,10 +83,9 @@
 ;; TODO show-response-value ?
 
 (deftest request-equality-test
-  (is (= (ajax/GET "/url") (ajax/GET "/url")))
-  )
+  (is (= (ajax/GET "/url") (ajax/GET "/url"))))
 
-(deftest delivery-queue-test
+(deftest delivery-test
   (let [req  (ajax/GET "/url")
         job (ajax/delivery-job! req :info)
 
@@ -95,47 +94,19 @@
         program (c/name-id "program")
         prog (c/named program (dom/div)) 
         
-        mk-env (fn [& [options]] (tu/env (ajax/delivery-queue prog :queue options)))]
-    (testing "starts running an action"
-      (let [env (mk-env)]
-        (tu/provided [ajax/execute (execute-dummy nil)]
-                     (tu/mount! env {:queue []})
-                     (is (= (c/return :state {:queue [(assoc job :status :pending)]})
-                            (tu/inject-action! (tu/find-named env program)
-                                               job)))
-                     (is (= (c/return :state {:queue [(assoc job :status :running)]})
-                            (tu/update! env {:queue [(assoc job :status :pending)]})))))
-      )
-    (testing "completes eventually"
-      (let [env (mk-env)]
+        mk-env (fn [states]
+                 (tu/env (ajax/delivery prog
+                                        (fn [state job]
+                                          (swap! states conj job)
+                                          (c/return)))))]
+    (testing "starts running a job and completes eventually"
+      (let [states (atom [])
+            env (mk-env states)]
+        ;; Note: it completes immediately, because of our fetch-once-dummy
         (tu/provided [ajax/execute (execute-dummy resp)]
-                     ;; Note: it completes immediately, because of our fetch-once-dummy
-                     (tu/mount! env {:queue []})
-                     ;; Note: job = (async/deliver req), but not with an unknown id.
-                     (is (= (c/return :state {:queue [(assoc job :status :pending)]})
-                            (tu/inject-action! (tu/find-named env program)
-                                               job)))
-                     (is (= (c/return :state {:queue [(assoc job :status :completed :response resp)]})
-                            (tu/update! env {:queue [(assoc job :status :pending)]})))))
-      )
-    (testing "does automatic cleanup"
-      (let [env (mk-env {:auto-cleanup? true})]
-        (tu/provided [ajax/execute (execute-dummy resp)]
-                     ;; Note: it completes immediately, because of our fetch-once-dummy
-                     (tu/mount! env {:queue []})
-                     (let [r (tu/inject-action! (tu/find-named env program)
-                                                job)]
-                       (is (= (c/return :state {:queue [(assoc job :status :pending)]})
-                              r))
-                       (is (= (c/return :state {:queue []})
-                              (tu/push!! env r))))))
-      (let [env (mk-env {:auto-cleanup? false})]
-        (tu/provided [ajax/execute (execute-dummy resp)]
-                     (tu/mount! env {:queue []})
-                     (is (= (c/return :state {:queue [(assoc job
-                                                             :status :completed
-                                                             :response resp)]})
-                            (tu/push!! env (tu/inject-action! (tu/find-named env program)
-                                                              job)))))))))
-
-
+                     (tu/mount! env nil)
+                     (tu/inject-action! (tu/find-named env program)
+                                        job)
+                     ;; will go immediately from pending to running.
+                     (is (= [(assoc job :status :pending) (assoc job :status :running) (assoc job :status :completed :response resp)]
+                            @states)))))))

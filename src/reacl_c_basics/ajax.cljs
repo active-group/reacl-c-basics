@@ -1,8 +1,9 @@
 (ns reacl-c-basics.ajax
   (:require [reacl-c.core :as c :include-macros true]
+            [reacl-c.base :as base]
             [reacl-c.dom :as dom]
             [active.clojure.cljs.record :as r :include-macros true]
-            [active.clojure.lens :as lens :include-macros true]
+            [active.clojure.lens :as lens]
             [ajax.core :as ajax]))
 
 (defn check-options-invariants! [options]
@@ -128,106 +129,84 @@
   ;; the job is the action for simplicity; id will be added in the 'handler'
   (make-delivery-job nil req info :pending nil))
 
-(defn- cleaned-up-lens
-  ([queue]
-   (not (some completed? queue)))
-  ([queue cleaned-up?]
-   (if cleaned-up?
-     (remove completed? queue)
-     queue)))
+(defn- ensure-id!
+  "add job id, if not set yet"
+  [a]
+  ;; TODO: should be an effect.
+  (if (nil? (delivery-job-id a))
+    (lens/shove a delivery-job-id (gensym "delivery-job"))
+    a))
 
-(def ^:private
-  delivery-queue-auto-cleanup
-  (c/focus cleaned-up-lens
-           (c/dynamic (fn [cleaned-up?]
-                        ;; Note: it might be dangerous to do this with
-                        ;; a 'once'; if it interferes with other state
-                        ;; updates, then make it asynchronous.
-                        (if (not cleaned-up?)
-                          (c/once (c/constantly (c/return :state true)))
-                          c/empty)))))
+(defn- ret-state [ret state]
+  (if (not (base/returned? ret))
+    ;; Note: must be a returned, but let reacl-c complain in the ordinary way.
+    [ret state]
+    (let [st (base/returned-state ret)]
+      (if (= st base/keep-state)
+        [ret state]
+        [(lens/shove ret base/returned-state base/keep-state) st]))))
 
-(let [handler (fn [lens state a]
-                (if (delivery-job? a)
-                  ;; FIXME: use focus, or lift-lens (for index lenses)
-                  (let [queue (lens/yank state lens)
-                        ;; add job id, if not set yet
-                        a (if (nil? (delivery-job-id a))
-                            (lens/shove a delivery-job-id (gensym "delivery-job"))
-                            a)]
-                    (c/return :state (lens/shove state lens (into (empty queue) (concat queue (list a))))))
-                  (c/return :action a)))]
-  (defn ^:no-doc delivery-queue-handler [e lens]
-    (c/handle-action e (c/partial handler lens))))
+(let [->running (fn [f [state job]]
+                  (if (= :pending (delivery-job-status job))
+                    (let [job (lens/shove job delivery-job-status :running)
+                          [ret state] (ret-state (f state job) state)]
+                      (base/merge-returned (c/return :state [state job])
+                                           ret))
+                    (c/return)))
+      ->completed (fn [f [state job] resp]
+                    (let [job (-> job
+                                  (lens/shove delivery-job-status :completed)
+                                  (lens/shove delivery-job-response resp))
+                          [ret state] (ret-state (f state job) state)]
+                      (base/merge-returned (c/return :state [state nil]) ;; nil to remove it from queue
+                                           ret)))]
+  (c/defn-dynamic job-executor [_ job] [f]
+    (c/fragment
+     (c/once (c/partial ->running f))
+     (fetch-once (delivery-job-request job)
+                 (c/partial ->completed f)))))
 
-(let [fetch-h (fn [job a]
-                (assert (response? a))
-                (c/return :state (assoc job
-                                        :status :completed
-                                        :response a)))
-      running-h (fn [job]
-                  (c/return :state (update job :status #(if (= :pending %) :running %))))]
-  (c/def-dynamic ^:private execute-job job
-    (c/fragment (c/once running-h)
-                (fetch-once (:req job)
-                            fetch-h))))
-
-(defrecord ^:private JobLens [id]
-  IFn
-  (-invoke [_ queue] (some #(and (= (:id %) id) %) queue))
-  (-invoke [_ queue upd]
-    (assert (= id (:id upd)) "Must not change id.")
-    (into (empty queue)
-          (map (fn [job]
-                 (if (= (:id job) id)
-                   upd
-                   job))
-               queue))))
-
-(c/def-dynamic ^:private delivery-queue-parallel-executor queue
-  (apply c/fragment
-         (map (fn [job]
-                (-> (c/focus (JobLens. (:id job)) execute-job)
-                    ;; Note: I think we depend on a key, so that jobs are not 'remounted'='restarted' when the queue changes :-/
-                    ;; Could only change that by not using a subscription, I think.
-                    (c/keyed (:id job))))
-              (filter #(not (completed? %)) queue))))
-
-(c/def-dynamic ^:private delivery-queue-sequential-executor queue
-  (if-let [job (first (filter #(not (completed? %)) queue))]
-    (c/focus (JobLens. (:id job)) execute-job)
-    c/empty))
-
-(defn delivery-queue
-  "Returns an item that manages a sequence of Ajax requests in its
-  state, under the given `lens`. You can add [[delivery-job]] values
-  to it, or use [[deliver]] to get an action that can be emitted by
-  `e` and adds jobs to the end of the queue.
+(let [add-jobs (fn [f [state queue] a]
+                 (if (delivery-job? a)
+                   (let [job (ensure-id! a)]
+                     ;; run :pending
+                     (let [[ret state] (ret-state (f state job) state)]
+                       (base/merge-returned (c/return :state [state (conj queue job)])
+                                            ret)))
+                   (c/return :action a)))
+      job-lens (fn ;; the job needs the item state, and the single job.
+                 ([id [state queue]]
+                  [state (first (filter #(= id (delivery-job-id %)) queue))])
+                 ([id [st0 queue] [state job]]
+                  [state
+                   (if (nil? job)
+                     ;; remove
+                     (remove #(= id (delivery-job-id %)) queue)
+                     (into (empty queue)
+                           (map (fn [j]
+                                  (if (= id (delivery-job-id j))
+                                    job
+                                    j))
+                                queue)))]))
+      run-jobs (fn [f [st0 queue]]
+                 (apply c/fragment
+                        (map (fn [id]
+                               (-> (c/focus (c/partial job-lens id)
+                                            (job-executor f))
+                                   (c/keyed (str id))))
+                             (map delivery-job-id queue))))]
+  (defn delivery
+    "Returns an item that manages execution of Ajax requests in its
+  local state. Use [[deliver]] to get an action that can be emitted by
+  `item` that adds a new delivery job to an internal queue.
 
   Jobs transition from a :pending state, over :running
-  into :completed (successful or not).  When `(:auto-cleanup?
-  options)` is true, sucessfully completed jobs are eventually removed
-  from the queue automatically. When `(:parallel? options)` is true,
-  then not only the first non-completed job is executed, but all are
-  started in parallel (though the browser might actually only run 2 at
-  the same time)."
-  [e lens & [options]]
-  ;; TODO: auto-cleanup as default?
-  (c/fragment (delivery-queue-handler e lens) ;; adds delivery actions to the queue
-              (c/focus lens
-                       (c/fragment
-                        ;; drives executing and waiting for a response
-                        (if (:parallel? options) delivery-queue-parallel-executor delivery-queue-sequential-executor)
-                        ;; removes completed jobs.
-                        (if (:auto-cleanup? options) delivery-queue-auto-cleanup c/empty)))))
-
-(defn hidden-delivery-queue
-  "Like [[delivery-queue]], but with a hidden queue in local state."
-  [e & [options]]
-  ;; TOOD: add a fn that can translate it into user state?
-  (c/local-state []
-                 (delivery-queue (c/focus c/first-lens e)
-                                 c/second-lens
-                                 (assoc options
-                                        :auto-cleanup? true))))
-
+  into :completed (successful or not), and for each transition `(f
+  state job)` is evaluated, which must return
+  a [[reacl-c.core/return]] value."
+    [item & [f]]
+    (c/local-state []
+                   (c/fragment
+                    (c/dynamic (c/partial run-jobs f))
+                    (c/handle-action (c/focus c/first-lens item)
+                                     (c/partial add-jobs (or f (c/constantly (c/return)))))))))
