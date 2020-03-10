@@ -9,7 +9,7 @@
 (c/defn-dynamic checkbox checked [& args]
   (let [[attrs children] (core/split-dom-attrs args)]
     (apply dom/input (merge {:type "checkbox"
-                             :value checked
+                             :checked checked
                              :onchange checked-state}
                             attrs)
            children)))
