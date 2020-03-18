@@ -44,7 +44,7 @@
         enter-text (fn [txt]
                      (let [comp (current-input)]
                        (tu/invoke-callback! comp :onchange
-                                          #js {:type "change" :target #js {:value txt}})))]
+                                            #js {:type "change" :target #js {:value txt}})))]
 
     (testing "shows initial value"
       (is (= (c/return)
@@ -60,8 +60,7 @@
       (is (= (c/return :state 10)
              (enter-text "10"))))
 
-    ;; TODO: should this hold? (test renderer is not easy on this)
-    #_(testing "returns nil but keeps text on invalid input"
+    (testing "returns nil but keeps text on invalid input"
       (is (= (c/return :state nil)
              (enter-text "foobar")))
       (tu/update! e nil)

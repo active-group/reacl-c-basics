@@ -51,8 +51,10 @@
   ;; (unparse state) => string
   ;; (parse string) => value
   ;; (restrict string) => string, preventing some input while typing.
-  (c/local-state {:text (unparse value)
-                  :pub value}
+  (c/local-state {:text ""
+                  :pub nil}
+                 #_{:text (unparse value)
+                    :pub value}
                  (c/focus (c/partial input-parsed-lens parse restrict unparse)
                           (apply input-string args))))
 
