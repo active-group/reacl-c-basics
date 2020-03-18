@@ -147,12 +147,10 @@
         [(lens/shove ret base/returned-state base/keep-state) st]))))
 
 (let [->running (fn [f [state job]]
-                  (if (= :pending (delivery-job-status job))
-                    (let [job (lens/shove job delivery-job-status :running)
-                          [ret state] (ret-state (f state job) state)]
-                      (base/merge-returned (c/return :state [state job])
-                                           ret))
-                    (c/return)))
+                  (let [job (lens/shove job delivery-job-status :running)
+                        [ret state] (ret-state (f state job) state)]
+                    (base/merge-returned (c/return :state [state job])
+                                         ret)))
       ->completed (fn [f [state job] resp]
                     (let [job (-> job
                                   (lens/shove delivery-job-status :completed)
@@ -160,19 +158,21 @@
                           [ret state] (ret-state (f state job) state)]
                       (base/merge-returned (c/return :state [state nil]) ;; nil to remove it from queue
                                            ret)))]
-  (c/defn-dynamic job-executor [_ job] [f]
-    (c/fragment
-     (c/once (c/partial ->running f))
-     (fetch-once (delivery-job-request job)
-                 (c/partial ->completed f)))))
+  (c/defn-dynamic job-executor [st job] [f]
+    (case (delivery-job-status job)
+      :pending (c/once (c/partial ->running f))
+      :running (fetch-once (delivery-job-request job)
+                           (c/partial ->completed f))
+      :completed c/empty)))
 
-(let [add-jobs (fn [f [state queue] a]
+(let [->pending (fn [f [state queue] job]
+                  ;; run :pending
+                  (let [[ret state] (ret-state (f state job) state)]
+                    (base/merge-returned (c/return :state [state (conj queue job)])
+                                         ret)))
+      add-jobs (fn [f [state queue] a]
                  (if (delivery-job? a)
-                   (let [job (ensure-id! a)]
-                     ;; run :pending
-                     (let [[ret state] (ret-state (f state job) state)]
-                       (base/merge-returned (c/return :state [state (conj queue job)])
-                                            ret)))
+                   (->pending f [state queue] (ensure-id! a))
                    (c/return :action a)))
       job-lens (fn ;; the job needs the item state, and the single job.
                  ([id [state queue]]

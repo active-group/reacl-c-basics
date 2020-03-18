@@ -92,21 +92,28 @@
         resp (ajax/ok-response :value)
 
         program (c/name-id "program")
-        prog (c/named program (dom/div)) 
+        prog (c/named program (dom/div))
+
+        add-status (fn [states state job]
+                     (let [st  (ajax/delivery-job-status job)]
+                       (swap! states conj st)
+                       (c/return :state (conj state st))))
         
         mk-env (fn [states]
                  (tu/env (ajax/delivery prog
-                                        (fn [state job]
-                                          (swap! states conj job)
-                                          (c/return)))))]
+                                        (c/partial add-status states))))]
     (testing "starts running a job and completes eventually"
       (let [states (atom [])
             env (mk-env states)]
         ;; Note: it completes immediately, because of our fetch-once-dummy
         (tu/provided [ajax/execute (execute-dummy resp)]
-                     (tu/mount! env nil)
-                     (tu/inject-action! (tu/find-named env program)
-                                        job)
+                     (tu/mount! env [])
+
+                     (let [r (tu/inject-action! (tu/find-named env program)
+                                                job)]
+                       ;; currently not properly testable, due to limitation/bug of the React test-renderer.
+                       #_(is (= (c/return :state [:pending :running :completed])
+                                r)))
                      ;; will go immediately from pending to running.
-                     (is (= [(assoc job :status :pending) (assoc job :status :running) (assoc job :status :completed :response resp)]
+                     (is (= [:pending :running :completed]
                             @states)))))))
