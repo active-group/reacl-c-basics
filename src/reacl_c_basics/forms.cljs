@@ -81,7 +81,7 @@
 
 (def ^:private integer-regex #"^[-]?\d*$")
 
-(defn- parse-int [s]
+(defn ^:no-doc parse-int [s]
   ;; see parse-number above - we additionally set a regex :pattern attribute (allegedly helps mobiles to show a number input)
   ;; and use the same here, because otherwise we would parse invalid inputs.
   (let [x (when (and (not (js/isNaN s))
@@ -93,19 +93,19 @@
         x
         nil))))
 
-(defn- unparse-int [v]
+(defn ^:no-doc unparse-int [v]
   (if v (str v) ""))
 
-(defn- restrict-int-chars [old new]
+(defn ^:no-doc restrict-int [old new]
   (apply str (filter #(.test #"[0-9-]" %) new)))
 
 (c/defn-named input-int [& args]
   (let [[attrs content] (core/split-dom-attrs args)]
     (apply input-parsed parse-int unparse-int
-           ;; Note with type 'number' we don't even see a lot of the 'invalid' inputs; so restrict-int-chars makes only sense for :text
+           ;; Note with type 'number' we don't even see a lot of the 'invalid' inputs; so restrict-int makes only sense for :text
            ;; But that should not be used - on smart phones, the number pad usually only shows up for :type "number".
            (if (= "text" (:type attrs))
-             restrict-int-chars
+             restrict-int
              unrestricted)
            (merge {:pattern #(or % (str integer-regex))}
                   attrs)
