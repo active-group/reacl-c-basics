@@ -107,7 +107,7 @@
            (if (= "text" (:type attrs))
              restrict-int-chars
              unrestricted)
-           (merge {:pattern #(or % integer-regex)}
+           (merge {:pattern #(or % (str integer-regex))}
                   attrs)
            content)))
 
