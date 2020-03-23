@@ -65,9 +65,16 @@
 
 (let [set-focused-a (fn [v state _]
                       (c/return :action (SetFocused. v)))
-      set-focused (fn [state a]
+      set-focused (fn [parse unparse state a]
                     (if (instance? SetFocused a)
-                      (c/return :state (assoc-in state [1 :focused?] (:value a)))
+                      (c/return :state (cond-> (assoc-in state [1 :focused?] (:value a))
+                                         ;; on focus, init local :text state.
+                                         (:value a)
+                                         (assoc-in [1 :text] (unparse (first state)))
+                                         ;; on blur, set value again.
+                                         (not (:value a))
+                                         (assoc 0 (parse (get-in state [1 :text])))
+                                         ))
                       (c/return :action a)))]
   (c/defn-dynamic ^:no-doc input-parsed value [parse unparse restrict & args]
     ;; this keeps the text the user entered, iff and as long as the input has the focus, and changes it to (unparse value) otherwise.
@@ -81,7 +88,7 @@
                                                 :onfocus (c/partial set-focused-a true)
                                                 :onblur (c/partial set-focused-a false))
                                          content))
-                         (c/handle-action set-focused))))))
+                         (c/handle-action (c/partial set-focused parse unparse)))))))
 
 (defn- parse-number [s]
   ;; Note: "" parses as NaN although it's not isNaN; parseFloat ignores trailing extra chars; but isNaN does not:
