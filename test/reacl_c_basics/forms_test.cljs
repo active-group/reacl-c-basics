@@ -60,8 +60,16 @@
       (is (= (c/return :state 10)
              (enter-text "10"))))
 
-    (testing "returns nil but keeps text on invalid input"
+    (testing "returns nil but keeps text on invalid input if focused"
+      (tu/invoke-callback! (current-input) :onfocus
+                           #js {:type "focus"})
       (is (= (c/return :state nil)
              (enter-text "foobar")))
       (tu/update! e nil)
-      (is (= "foobar" (current-text))))))
+      (is (= "foobar" (current-text))))
+
+    (testing "then, on blur, sets the text to the unparsed text."
+      (tu/invoke-callback! (current-input) :onblur
+                           #js {:type "blur"})
+      (is (= "" (current-text))))
+    ))
