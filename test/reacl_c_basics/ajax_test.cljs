@@ -74,6 +74,20 @@
                                                 (c/return))))]
              (maybe-execute-effects! env (tu/mount! env nil))))))
 
+(deftest fetch-once-convert-2-test
+  (async done
+         (let [dummy (dummy-ajax nil [true ::value])]
+           (let [env (tu/env (ajax/fetch-once (-> (ajax/request dummy "uri")
+                                                  (ajax/map-ok-response (fn [value]
+                                                                          (is (= ::value value))
+                                                                          ::other-value)))
+                                              (fn [state response]
+                                                (is (ajax/response-ok? response))
+                                                (is (= ::other-value (ajax/response-value response)))
+                                                (done)
+                                                (c/return))))]
+             (maybe-execute-effects! env (tu/mount! env nil))))))
+
 (defn execute-dummy [result]
   (let [a (c/return :action result)]
     (fn [req f & args]

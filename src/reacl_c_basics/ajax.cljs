@@ -45,7 +45,7 @@
               f)]
       (assoc-in req [:options :convert-response] f))))
 
-(let [g (fn [f resp & args]
+(let [g (fn [resp f & args]
           (if (response-ok? resp)
             (assoc resp :value (apply f (response-value resp) args))
             resp))]
