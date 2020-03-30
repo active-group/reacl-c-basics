@@ -3,6 +3,7 @@
             [reacl-c.base :as base]
             [reacl-c.dom :as dom]
             [active.clojure.cljs.record :as r :include-macros true]
+            [active.clojure.functions :as f]
             [active.clojure.lens :as lens]
             [ajax.core :as ajax]))
 
@@ -32,6 +33,28 @@
   (check-options-invariants! options)
   (make-request f uri options))
 
+(let [g (fn [f args resp]
+          (apply f resp args))]
+  (defn map-response
+    "Convert the response to the given request through a call to `(f response & args)`."
+    [req f & args]
+    (assert (instance? Request req))
+    (let [f (if args (f/partial g f args) f)
+          f (if-let [f2 (:convert-response (:options req))]
+              (f/comp f f2)
+              f)]
+      (assoc-in req [:options :convert-response] f))))
+
+(let [g (fn [f resp & args]
+          (if (response-ok? resp)
+            (assoc resp :value (apply f (response-value resp) args))
+            resp))]
+  (defn map-ok-response
+    "Convert the [[response-value]] to the given request through a
+  call to `(f response & args)` if it's an ok response."
+    [req f & args]
+    (apply map-response req g f args)))
+
 (defn GET [uri & [options]] (request ajax/GET uri options))
 (defn HEAD [uri & [options]] (request ajax/HEAD uri options))
 (defn POST [uri & [options]] (request ajax/POST uri options))
@@ -44,14 +67,16 @@
 
 (defn- execute-request! [request handler]
   (let [{f :f uri :uri options :options} request
-        nopts (assoc options
-                     :handler
-                     (fn [response]
-                       (handler (make-response true response)))
-                     :error-handler
-                     (fn [error]
-                       (when (not= :aborted (:failure error))
-                         (handler (make-response false error)))))]
+        conv (or (:convert-response options) identity)
+        nopts (-> options
+                  (assoc :handler
+                         (fn [response]
+                           (handler (conv (make-response true response))))
+                         :error-handler
+                         (fn [error]
+                           (when (not= :aborted (:failure error))
+                             (handler (conv (make-response false error))))))
+                  (dissoc :convert-response))]
     (f uri nopts)))
 
 (c/defn-subscription execute deliver! [request]
