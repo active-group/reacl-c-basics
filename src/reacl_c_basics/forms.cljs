@@ -23,7 +23,8 @@
 (defn- value-state [_ e]
   (c/return :state (.. e -target -value)))
 
-(c/defn-dynamic ^:private input-value value [f fixed-attrs & args]
+(c/defn-dynamic ^:private input-value value [f fixed-attrs args]
+  ;; Note: args must not be var-args, to workaround various (!) clojurescript bugs with >= 21 args and IFns.
   (let [[attrs children] (core/split-dom-attrs args)]
     (apply f (merge fixed-attrs
                     {:value value
@@ -32,7 +33,7 @@
            children)))
 
 (defn input-string [& args]
-  (apply input-value dom/input {:type "text"} args))
+  (input-value dom/input {:type "text"} args))
 
 (defn- input-parsed-lens*
   ([parse restrict [value text]]
@@ -144,7 +145,7 @@
            content)))
 
 (defn textarea [& args]
-  (apply input-value dom/textarea {} args))
+  (input-value dom/textarea {} args))
 
 ;; select and options, extended to work with arbitrary clojure values.
 (defn- pr-str-lens
@@ -153,6 +154,9 @@
                   (first l)
                   ;; selected value not in list? keep previous
                   p)))
+
+(c/defn-static ^:private select-opt-list [options]
+  (apply c/fragment options))
 
 (defn select [& args]
   (let [[attrs options] (core/split-dom-attrs args)
@@ -165,7 +169,10 @@
         options_ (map (fn [opt] (update-in opt [:attrs :value] pr-str))
                       options)]
     (c/focus (c/partial pr-str-lens values)
-             (apply input-value dom/select {} (cons attrs options_)))))
+             (input-value dom/select {}
+                          [attrs (select-opt-list options_)]
+                          ;; (cons attrs options_)
+                          ))))
 
 (defn option [& args]
   (apply dom/option args))
