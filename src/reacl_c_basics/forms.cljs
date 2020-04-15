@@ -147,6 +147,17 @@
 (defn textarea [& args]
   (input-value dom/textarea {} args))
 
+(c/defn-static ^:private select-opt-list [options]
+  (apply c/fragment options))
+
+(defn- select-string* [attrs options]
+  (input-value dom/select {}
+               [attrs (select-opt-list options)]))
+
+(defn select-string [& args]
+  (let [[attrs options] (core/split-dom-attrs args)]
+    (select-string* attrs options)))
+
 ;; select and options, extended to work with arbitrary clojure values.
 (defn- pr-str-lens
   ([values v] (pr-str v))
@@ -155,10 +166,8 @@
                   ;; selected value not in list? keep previous
                   p)))
 
-(c/defn-static ^:private select-opt-list [options]
-  (apply c/fragment options))
-
 (defn select [& args]
+  ;; Note: use select-string if options are strings already (much faster)
   (let [[attrs options] (core/split-dom-attrs args)
         values (map (fn [opt]
                       ;; TODO: add dom/element-attrs, element-type or something? as a lens?
@@ -169,10 +178,7 @@
         options_ (map (fn [opt] (update-in opt [:attrs :value] pr-str))
                       options)]
     (c/focus (c/partial pr-str-lens values)
-             (input-value dom/select {}
-                          [attrs (select-opt-list options_)]
-                          ;; (cons attrs options_)
-                          ))))
+             (select-string* attrs options_))))
 
 (defn option [& args]
   (apply dom/option args))
