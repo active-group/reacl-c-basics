@@ -94,7 +94,7 @@
 (defn- parse-number [s]
   ;; Note: "" parses as NaN although it's not isNaN; parseFloat ignores trailing extra chars; but isNaN does not:
   (let [x (when (not (js/isNaN s))
-            (.parseFloat js/Number s))]
+            (js/parseFloat s))]
     (if (js/isNaN x)
       nil
       x)))
@@ -119,7 +119,7 @@
   ;; and use the same here, because otherwise we would parse invalid inputs.
   (let [x (when (and (not (js/isNaN s))
                      (.test integer-regex s))
-            (.parseInt js/Number s))]
+            (js/parseInt s))]
     (if (js/isNaN x)
       nil
       (if (integer? x) ;; probably always the case
