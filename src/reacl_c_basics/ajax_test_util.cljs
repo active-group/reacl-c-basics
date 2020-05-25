@@ -45,8 +45,8 @@
       (let [req (request-subscribe-effect-request eff)]
         (if-let [resp (f req)]
           ;; TODO: merge-returned should be in core or tu
-          (reacl-c.base/merge-returned (tu/subscription-start-return env eff)
-                                       (tu/subscription-result-return env eff resp))
+          (reacl-c.base/merge-returned (tu/subscription-start-return eff)
+                                       (tu/subscription-result-return eff resp))
           (c/return :action eff)))
       
       (request-unsubscribe-effect? eff)

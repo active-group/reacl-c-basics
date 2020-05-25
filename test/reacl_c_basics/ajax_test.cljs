@@ -3,6 +3,7 @@
             [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom]
             [reacl-c.test-util.core :as tu :include-macros true]
+            [active.clojure.functions :as f]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
 
 (defn after [ms thunk]
@@ -93,7 +94,7 @@
     (fn [req f & args]
       ;; if result = nil, it never completes; otherwise immediately on mount.
       (if (some? result)
-        (c/once (c/constantly a))
+        (c/once (f/constantly a))
         (c/fragment)))))
 
 (deftest fetch-test
@@ -129,7 +130,7 @@
         
         mk-env (fn [states]
                  (tu/env (ajax/delivery prog
-                                        (c/partial add-status states))))]
+                                        (f/partial add-status states))))]
     (testing "starts running a job and completes eventually"
       (let [states (atom [])
             env (mk-env states)]

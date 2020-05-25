@@ -2,6 +2,7 @@
   (:require [reacl-c.core :as c]
             [reacl-c.browser :as browser]
             [reacl2.core :as rcore :include-macros true]
+            [active.clojure.functions :as f]
             [reacl-basics.pages.routes :as routes]
             [reacl-basics.pages.core :as p]))
 
@@ -26,7 +27,7 @@
   page params of the route (if any) and an optional map of query
   params, and which must return an item representing that page."
   [f]
-  (p/page (c/partial reacl-page f)))
+  (p/page (f/partial reacl-page f)))
 
 (defn- lift-pages-map [pages]
   ;; this adds the 'reacl' wrapper, and allows to put ordinary functions into the map.

@@ -1,5 +1,7 @@
 (ns reacl-c-basics.media-query
-  (:require [reacl-c.core :as c :include-macros true]))
+  (:require [reacl-c.core :as c :include-macros true]
+            [active.clojure.functions :as f]
+            [active.clojure.lens :as lens]))
 
 (c/defn-subscription changes
   "Returns a subscription item, emitting changes of the result of the
@@ -32,11 +34,11 @@
                       as-state))))
 
 (let [call-f (fn [f args [_ res]]
-               (c/focus c/first-lens (apply f res args)))]
+               (c/focus lens/first (apply f res args)))]
   (defn with-result
     "Returns an item the calls `f` with the result of the given media query, and calls it again when it changes over time."
     [query f & args]
     (c/local-state false
                    (c/fragment
-                    (c/focus c/second-lens (result query))
-                    (c/dynamic (c/partial call-f f args))))))
+                    (c/focus lens/second (result query))
+                    (c/dynamic (f/partial call-f f args))))))

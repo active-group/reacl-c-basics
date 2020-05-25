@@ -1,6 +1,7 @@
 (ns reacl-c-basics.forms
   (:require [reacl-c.core :as c]
             [reacl-c.dom :as dom]
+            [active.clojure.functions :as f]
             [reacl-c-basics.core :as core :include-macros true]))
 
 (defn- checked-state [_ e]
@@ -48,7 +49,7 @@
   ;; (parse string) => value
   ;; (restrict prev-text next-text) => string, preventing some input while typing.
   (let [[attrs content] (core/split-dom-attrs args)]
-    (c/focus (c/partial input-parsed-lens* parse restrict)
+    (c/focus (f/partial input-parsed-lens* parse restrict)
              (apply input-string attrs content))))
 
 (defn- input-parsed-lens
@@ -83,13 +84,13 @@
     (let [[attrs content] (core/split-dom-attrs args)]
       (c/local-state {:text ""
                       :focused? false}
-                     (-> (c/focus (c/partial input-parsed-lens unparse)
+                     (-> (c/focus (f/partial input-parsed-lens unparse)
                                   (apply input-parsed* parse restrict
                                          (assoc attrs
-                                                :onfocus (c/partial set-focused-a true)
-                                                :onblur (c/partial set-focused-a false))
+                                                :onfocus (f/partial set-focused-a true)
+                                                :onblur (f/partial set-focused-a false))
                                          content))
-                         (c/handle-action (c/partial set-focused parse unparse)))))))
+                         (c/handle-action (f/partial set-focused parse unparse)))))))
 
 (defn- parse-number [s]
   ;; Note: "" parses as NaN although it's not isNaN; parseFloat ignores trailing extra chars; but isNaN does not:
@@ -177,7 +178,7 @@
         _ (assert (= (count values) (count (set (map pr-str values)))) "Two or more options have the same 'pr-str' representation.")
         options_ (map (fn [opt] (update-in opt [:attrs :value] pr-str))
                       options)]
-    (c/focus (c/partial pr-str-lens values)
+    (c/focus (f/partial pr-str-lens values)
              (select-string* attrs options_))))
 
 (defn option [& args]
@@ -200,10 +201,10 @@
   ;; :onsubmit a (fn [value]) => (c/return).
   (apply dom/form
          (cond-> (merge (when-let [default (:default attrs)]
-                          {:onreset (c/constantly (c/return :state default))})
+                          {:onreset (f/constantly (c/return :state default))})
                         attrs)
            true (dissoc :default)
-           (:onsubmit attrs) (assoc :onsubmit (c/partial submitter (:onsubmit attrs))))
+           (:onsubmit attrs) (assoc :onsubmit (f/partial submitter (:onsubmit attrs))))
          content))
 
 (c/defn-named local-form [& args]

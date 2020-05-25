@@ -185,9 +185,9 @@
                                            ret)))]
   (c/defn-dynamic job-executor [st job] [f]
     (case (delivery-job-status job)
-      :pending (c/once (c/partial ->running f))
+      :pending (c/once (f/partial ->running f))
       :running (fetch-once (delivery-job-request job)
-                           (c/partial ->completed f))
+                           (f/partial ->completed f))
       :completed c/empty)))
 
 (let [->pending (fn [f [state queue] job]
@@ -216,7 +216,7 @@
       run-jobs (fn [f [st0 queue]]
                  (apply c/fragment
                         (map (fn [id]
-                               (-> (c/focus (c/partial job-lens id)
+                               (-> (c/focus (f/partial job-lens id)
                                             (job-executor f))
                                    (c/keyed (str id))))
                              (map delivery-job-id queue))))]
@@ -232,6 +232,6 @@
     [item & [f]]
     (c/local-state []
                    (c/fragment
-                    (c/dynamic (c/partial run-jobs f))
-                    (c/handle-action (c/focus c/first-lens item)
-                                     (c/partial add-jobs (or f (c/constantly (c/return)))))))))
+                    (c/dynamic (f/partial run-jobs f))
+                    (c/handle-action (c/focus lens/first item)
+                                     (f/partial add-jobs (or f (f/constantly (c/return)))))))))
