@@ -1,52 +1,58 @@
 (ns reacl-c-basics.debounce
   (:require [reacl-c.core :as c]
+            [reacl-c-basics.core :as core]
+            [active.clojure.lens :as lens]
             [active.clojure.functions :as f]))
 
-(c/defn-subscription animation-frame deliver! [_]
-  (let [id (js/window.requestAnimationFrame (fn [timestamp]
-                                              (deliver! timestamp)))]
-    (fn []
-      (js/window.cancelAnimationFrame id))))
+(defrecord ^:private Publish [previous state])
 
-(c/defn-subscription timer deliver! [ms _]
-  (let [id (js/window.setTimeout (fn []
-                                   (deliver! true))
-                                 ms)]
-    (fn []
-      (js/window.clearTimeout id))))
-
-(let [publish (fn [[outer {dirty? :dirty? outgoing :outgoing}] _]
-                (c/return :state [outgoing {:dirty? false :outgoing nil}]))]
-  (c/defn-dynamic ^:private publisher [outer {dirty? :dirty? outgoing :outgoing}] [f]
-    (if dirty?
-      ;; we want to enforce a restart of the publisher overytime something changes; so add a random key:
-      (-> (f (str (rand)))
+(let [publish (fn [{dirty :dirty previous :previous outgoing :outgoing} _]
+                (c/return :action (Publish. previous outgoing)
+                          :state {:dirty nil
+                                  :previous nil
+                                  :outgoing nil}))]
+  (c/defn-dynamic ^:private publisher {dirty :dirty} [f]
+    (if dirty
+      ;; we want to enforce a restart of the publisher everytime something changes; so add a (random) key:
+      (-> f
+          (c/keyed (str dirty))
           (c/handle-action publish))
       c/empty)))
 
 (defn- current-state
-  ([[outer {dirty? :dirty? outgoing :outgoing}]]
-   (if dirty? outgoing outer))
-  ([[outer {dirty? :dirty? outgoing :outgoing}] new-inner]
-   [outer {:dirty? true :outgoing new-inner}]))
+  ([[outer {dirty :dirty outgoing :outgoing}]]
+   (if dirty outgoing outer))
+  ([[outer {dirty :dirty}] new-inner]
+   [outer {:dirty (if dirty (inc dirty) 0)
+           :previous outer
+           :outgoing new-inner}]))
 
-(defn- debouncer [item f]
-  ;; TODO: we should check if the outer state has changed, with
-  ;; respect to the beginning of the delay, and add an optional fn to
-  ;; resolve such a conflict.
-  (c/local-state {:dirty? false
-                  :outgoing nil}
-                 (c/fragment (c/focus current-state item)
-                             (publisher f))))
+(let [set-state (fn [opt-resolve current a]
+                  (if (instance? Publish a)
+                    (c/return :state
+                              (if (and opt-resolve
+                                       (not= current (:previous a)))
+                                (opt-resolve current (:state a))
+                                (:state a)))
+                    (c/return :action a)))]
+  (c/defn-dynamic ^:private debouncer outer-1 [item f opt-resolve]
+    ;; respect to the beginning of the delay, and add an optional fn to
+    ;; resolve such a conflict.
+    (-> (c/local-state {:dirty nil
+                        :previous nil
+                        :outgoing nil}
+                       (c/fragment (c/focus current-state item)
+                                   (c/focus lens/second (publisher f))))
+        (c/handle-action (f/partial set-state opt-resolve)))))
 
 (defn debounce
   "Delays the upward propagation of state updates of the given item,
   until the next animation frame."
-  [item]
-  (debouncer item animation-frame))
+  [item & [resolve-conflict]]
+  (debouncer item (core/animation-frame) resolve-conflict))
 
 (defn debounce-delay
   "Delays the upward propagation of state updates of the given item,
   for the given number of milliseconds."
-  [ms item]
-  (debouncer item (f/partial timer ms)))
+  [ms item & [resolve-conflict]]
+  (debouncer item (core/timeout ms) resolve-conflict))
