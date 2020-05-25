@@ -33,7 +33,7 @@
                dummy (dummy-ajax started [true ::value])]
            (let [env (tu/env (ajax/fetch-once (ajax/request dummy "uri")
                                               (fn [_ _]
-                                                (done)
+                                                (js/window.setTimeout done 0)
                                                 (c/return))))]
              (is (not @started))
              (maybe-execute-effects! env (tu/mount! env nil))
@@ -46,7 +46,7 @@
                                               (fn [state response]
                                                 (is (ajax/response-ok? response))
                                                 (is (= ::value (ajax/response-value response)))
-                                                (done)
+                                                (js/window.setTimeout done 0)
                                                 (c/return))))]
              (maybe-execute-effects! env (tu/mount! env nil))))))
 
@@ -57,7 +57,7 @@
                                               (fn [state response]
                                                 (is (not (ajax/response-ok? response)))
                                                 (is (= {:v ::error} (ajax/response-value response)))
-                                                (done)
+                                                (js/window.setTimeout done 0)
                                                 (c/return))))]
              (maybe-execute-effects! env (tu/mount! env nil))))))
 
@@ -71,7 +71,7 @@
                                                                        ::other-value)))
                                               (fn [state response]
                                                 (is (= ::other-value response))
-                                                (done)
+                                                (js/window.setTimeout done 0)
                                                 (c/return))))]
              (maybe-execute-effects! env (tu/mount! env nil))))))
 
@@ -85,7 +85,7 @@
                                               (fn [state response]
                                                 (is (ajax/response-ok? response))
                                                 (is (= ::other-value (ajax/response-value response)))
-                                                (done)
+                                                (js/window.setTimeout done 0)
                                                 (c/return))))]
              (maybe-execute-effects! env (tu/mount! env nil))))))
 
