@@ -1,6 +1,6 @@
 (ns reacl-c-basics.core
   (:require [reacl-c.dom :as dom]
-            [reacl-c.core :as c]))
+            [reacl-c.core :as c :include-macros true]))
 
 (defn ^:no-doc split-dom-attrs [args]
   (if (and (not-empty args)

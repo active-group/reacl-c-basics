@@ -1,6 +1,6 @@
 (ns reacl-c-basics.debounce
-  (:require [reacl-c.core :as c]
-            [reacl-c-basics.core :as core]
+  (:require [reacl-c.core :as c :include-macros true]
+            [reacl-c-basics.core :as core :include-macros true]
             [active.clojure.lens :as lens]
             [active.clojure.functions :as f]))
 

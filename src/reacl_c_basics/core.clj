@@ -1,5 +1,5 @@
 (ns reacl-c-basics.core
-  (:require [reacl-c.core :as c]))
+  (:require [reacl-c.core :as c :include-macros true]))
 
 (defmacro defn-dom
   "Defines a function similar to the dom functions, in that the first

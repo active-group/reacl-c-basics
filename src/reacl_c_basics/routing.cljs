@@ -1,5 +1,5 @@
 (ns reacl-c-basics.routing
-  (:require [reacl-c.core :as c]
+  (:require [reacl-c.core :as c :include-macros true]
             [reacl-c.browser :as browser]
             [reacl2.core :as rcore :include-macros true]
             [active.clojure.functions :as f]
