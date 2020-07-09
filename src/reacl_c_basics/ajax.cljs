@@ -98,14 +98,15 @@
 (let [handler (fn [_ response]
                 (assert (response? response))
                 (c/return :state response))]
-  (c/defn-dynamic fetch "Returns an invisible item, that will
+  (c/defn fetch "Returns an invisible item, that will
   execute the given request whenever its state is or becomes nil, and
   set its state to the success or error response as soon as
   available."
-    response [req]
-  (if (some? response)
-    (c/fragment)
-    (fetch-once req handler))))
+    [req]
+    (c/with-state-as response
+      (if (some? response)
+        (c/fragment)
+        (fetch-once req handler)))))
 
 (defn throw-response-error [error]
   ;; error = {:status ...}
@@ -183,12 +184,13 @@
                           [ret state] (ret-state (f state job) state)]
                       (base/merge-returned (c/return :state [state nil]) ;; nil to remove it from queue
                                            ret)))]
-  (c/defn-dynamic job-executor [st job] [f]
-    (case (delivery-job-status job)
-      :pending (c/once (f/partial ->running f))
-      :running (fetch-once (delivery-job-request job)
-                           (f/partial ->completed f))
-      :completed c/empty)))
+  (c/defn job-executor [f]
+    (c/with-state-as [st job]
+      (case (delivery-job-status job)
+        :pending (c/once (f/partial ->running f))
+        :running (fetch-once (delivery-job-request job)
+                             (f/partial ->completed f))
+        :completed c/empty))))
 
 (let [->pending (fn [f [state queue] job]
                   ;; run :pending

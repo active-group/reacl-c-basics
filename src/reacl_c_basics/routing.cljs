@@ -12,8 +12,8 @@
   ;; TODO: redirect messages?
   
   render
-  (browser/render (rcore/bind this)
-                  (apply f args)))
+  (browser/reacl-render (rcore/bind this)
+                        (apply f args)))
 
 (defn- reacl-page [f opt state & args]
   ;; Note: reacl-basics still uses the old style, and maybe core/defc is not fully compatible as it seems
@@ -38,7 +38,7 @@
 (defn ^:no-doc history-router
   "For testing with a mocked history implementation."
   [history-impl pages]
-  (browser/lift reacl-basics.pages.router/history-router history-impl (lift-pages-map pages)))
+  (browser/lift-reacl reacl-basics.pages.router/history-router history-impl (lift-pages-map pages)))
 
 (defn html5-history-router
   "An item that renders to one of the pages from the given map of
@@ -46,7 +46,7 @@
   monitored for changes. It also handles [[goto]] actions emitted from
   within, modifying the browser history accordingly."
   [pages]
-  (browser/lift p/html5-history-router (lift-pages-map pages)))
+  (browser/lift-reacl p/html5-history-router (lift-pages-map pages)))
 
 (defn goto
   "Returns an action to go to the given path."

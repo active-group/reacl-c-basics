@@ -5,17 +5,18 @@
             [reacl-c-basics.core :as core :include-macros true]))
 
 (defn- checked-state [_ e]
-  (c/return :state (.. e -target -checked)))
+  (.. e -target -checked))
 
-(c/defn-dynamic checkbox checked [& args]
-  (let [[attrs children] (core/split-dom-attrs args)]
-    (apply dom/input (merge {:type "checkbox"
-                             :checked checked
-                             :onchange checked-state}
-                            attrs)
-           children)))
+(c/defn checkbox [& args]
+  (c/with-state-as checked
+    (let [[attrs children] (core/split-dom-attrs args)]
+      (apply dom/input (merge {:type "checkbox"
+                               :checked checked
+                               :onchange checked-state}
+                              attrs)
+             children))))
 
-(c/defn-named radio [& args]
+(c/defn radio [& args]
   (let [[attrs children] (core/split-dom-attrs args)]
     (apply checkbox (merge {:type "radio"}
                            attrs)
@@ -24,14 +25,15 @@
 (defn- value-state [_ e]
   (c/return :state (.. e -target -value)))
 
-(c/defn-dynamic ^:private input-value value [f fixed-attrs args]
-  ;; Note: args must not be var-args, to workaround various (!) clojurescript bugs with >= 21 args and IFns.
-  (let [[attrs children] (core/split-dom-attrs args)]
-    (apply f (merge fixed-attrs
-                    {:value value
-                     :onchange value-state}
-                    attrs)
-           children)))
+(c/defn ^:private input-value [f fixed-attrs args]
+  (c/with-state-as value
+    ;; Note: args must not be var-args, to workaround various (!) clojurescript bugs with >= 21 args and IFns.
+    (let [[attrs children] (core/split-dom-attrs args)]
+      (apply f (merge fixed-attrs
+                      {:value value
+                       :onchange value-state}
+                      attrs)
+             children))))
 
 (defn input-string [& args]
   (input-value dom/input {:type "text"} args))
@@ -44,13 +46,14 @@
          v (parse mod-text)]
      [v mod-text])))
 
-(c/defn-dynamic ^:no-doc input-parsed* [value text] [parse restrict & args]
-  ;; state = [value text] on the currently parsed value (or nil if not possible), and the actual text entered/shown.
-  ;; (parse string) => value
-  ;; (restrict prev-text next-text) => string, preventing some input while typing.
-  (let [[attrs content] (core/split-dom-attrs args)]
-    (c/focus (f/partial input-parsed-lens* parse restrict)
-             (apply input-string attrs content))))
+(c/defn ^:no-doc input-parsed* [parse restrict & args]
+  (c/with-state-as [value text]
+    ;; state = [value text] on the currently parsed value (or nil if not possible), and the actual text entered/shown.
+    ;; (parse string) => value
+    ;; (restrict prev-text next-text) => string, preventing some input while typing.
+    (let [[attrs content] (core/split-dom-attrs args)]
+      (c/focus (f/partial input-parsed-lens* parse restrict)
+               (apply input-string attrs content)))))
 
 (defn- input-parsed-lens
   ([unparse [value {text :text focused? :focused?}]]
@@ -78,19 +81,20 @@
                                          (assoc 0 (parse (get-in state [1 :text])))
                                          ))
                       (c/return :action a)))]
-  (c/defn-dynamic ^:no-doc input-parsed value [parse unparse restrict & args]
-    ;; this keeps the text the user entered, iff and as long as the input has the focus, and changes it to (unparse value) otherwise.
-    ;; Note: use input-parsed* if you need to distinguish between 'no input' and 'invalid input'.
-    (let [[attrs content] (core/split-dom-attrs args)]
-      (c/local-state {:text ""
-                      :focused? false}
-                     (-> (c/focus (f/partial input-parsed-lens unparse)
-                                  (apply input-parsed* parse restrict
-                                         (assoc attrs
-                                                :onfocus (f/partial set-focused-a true)
-                                                :onblur (f/partial set-focused-a false))
-                                         content))
-                         (c/handle-action (f/partial set-focused parse unparse)))))))
+  (c/defn ^:no-doc input-parsed [parse unparse restrict & args]
+    (c/with-state-as value
+      ;; this keeps the text the user entered, iff and as long as the input has the focus, and changes it to (unparse value) otherwise.
+      ;; Note: use input-parsed* if you need to distinguish between 'no input' and 'invalid input'.
+      (let [[attrs content] (core/split-dom-attrs args)]
+        (c/local-state {:text ""
+                        :focused? false}
+                       (-> (c/focus (f/partial input-parsed-lens unparse)
+                                    (apply input-parsed* parse restrict
+                                           (assoc attrs
+                                                  :onfocus (f/partial set-focused-a true)
+                                                  :onblur (f/partial set-focused-a false))
+                                           content))
+                           (c/handle-action (f/partial set-focused parse unparse))))))))
 
 (defn- parse-number [s]
   ;; Note: "" parses as NaN although it's not isNaN; parseFloat ignores trailing extra chars; but isNaN does not:
@@ -106,7 +110,7 @@
 (defn- unrestricted [old new]
   new)
 
-(c/defn-named input-number [& args]
+(c/defn input-number [& args]
   (let [[attrs content] (core/split-dom-attrs args)]
     (apply input-parsed parse-number unparse-number unrestricted
            (merge {:type "number"}
@@ -133,7 +137,7 @@
 (defn ^:no-doc restrict-int [old new]
   (apply str (filter #(.test #"[0-9-]" %) new)))
 
-(c/defn-named input-int [& args]
+(c/defn input-int [& args]
   (let [[attrs content] (core/split-dom-attrs args)]
     (apply input-parsed parse-int unparse-int
            ;; Note with type 'number' we don't even see a lot of the 'invalid' inputs; so restrict-int makes only sense for :text
@@ -148,7 +152,7 @@
 (defn textarea [& args]
   (input-value dom/textarea {} args))
 
-(c/defn-static ^:private select-opt-list [options]
+(c/defn ^:private select-opt-list :static [options]
   (apply c/fragment options))
 
 (defn- select-string* [attrs options]
@@ -196,7 +200,7 @@
   (.preventDefault ev)
   (f value))
 
-(c/defn-named form [attrs & content]
+(c/defn form [attrs & content]
   ;; :onreset a (c/return) value, automatically added when a :default is set.
   ;; :onsubmit a (fn [value]) => (c/return).
   (apply dom/form
@@ -207,7 +211,7 @@
            (:onsubmit attrs) (assoc :onsubmit (f/partial submitter (:onsubmit attrs))))
          content))
 
-(c/defn-named local-form [& args]
+(c/defn local-form [& args]
   ;; :default should be the default state value.
   ;; :onsubmit should be a fn of submitted value => return
   ;; :onreset is added and resets to the default value.

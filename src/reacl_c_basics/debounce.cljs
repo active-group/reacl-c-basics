@@ -11,13 +11,14 @@
                           :state {:dirty nil
                                   :previous nil
                                   :outgoing nil}))]
-  (c/defn-dynamic ^:private publisher {dirty :dirty} [f]
-    (if dirty
-      ;; we want to enforce a restart of the publisher everytime something changes; so add a (random) key:
-      (-> f
-          (c/keyed (str dirty))
-          (c/handle-action publish))
-      c/empty)))
+  (c/defn ^:private publisher [f]
+    (c/with-state-as {dirty :dirty}
+      (if dirty
+        ;; we want to enforce a restart of the publisher everytime something changes; so add a (random) key:
+        (-> f
+            (c/keyed (str dirty))
+            (c/handle-action publish))
+        c/empty))))
 
 (defn- current-state
   ([[outer {dirty :dirty outgoing :outgoing}]]
@@ -35,15 +36,16 @@
                                 (opt-resolve current (:state a))
                                 (:state a)))
                     (c/return :action a)))]
-  (c/defn-dynamic ^:private debouncer outer-1 [item f opt-resolve]
-    ;; respect to the beginning of the delay, and add an optional fn to
-    ;; resolve such a conflict.
-    (-> (c/local-state {:dirty nil
-                        :previous nil
-                        :outgoing nil}
-                       (c/fragment (c/focus current-state item)
-                                   (c/focus lens/second (publisher f))))
-        (c/handle-action (f/partial set-state opt-resolve)))))
+  (c/defn ^:private debouncer [item f opt-resolve]
+    (c/with-state-as outer-1
+      ;; respect to the beginning of the delay, and add an optional fn to
+      ;; resolve such a conflict.
+      (-> (c/local-state {:dirty nil
+                          :previous nil
+                          :outgoing nil}
+                         (c/fragment (c/focus current-state item)
+                                     (c/focus lens/second (publisher f))))
+          (c/handle-action (f/partial set-state opt-resolve))))))
 
 (defn debounce
   "Delays the upward propagation of state updates of the given item,
