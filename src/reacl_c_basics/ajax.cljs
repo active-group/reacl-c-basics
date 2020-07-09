@@ -87,18 +87,19 @@
 ;; fetching data from server ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn fetch-once
-    "Returns an invisible item, that will execute the given Ajax
+  "Returns an invisible item, that will execute the given Ajax
   request once, when mounted. When the request completes with an error
-  or success, then `(f state response)` is evaluated, which
-  must return a [[reacl-c.core/return]] value."
-    [req f]
-    (-> (execute req)
-        (c/handle-action f)))
+  or success, then `(f state response)` is evaluated, which must
+  return a [[reacl-c.core/return]] value."
+  [req f]
+  (-> (execute req)
+      (c/handle-action f)))
 
 (let [handler (fn [_ response]
                 (assert (response? response))
                 (c/return :state response))]
-  (c/defn fetch "Returns an invisible item, that will
+  (c/defn fetch
+    "Returns an invisible item, that will
   execute the given request whenever its state is or becomes nil, and
   set its state to the success or error response as soon as
   available."
@@ -107,6 +108,34 @@
       (if (some? response)
         (c/fragment)
         (fetch-once req handler)))))
+
+(let [handler (fn [_ response]
+                (c/return :state [response false]))]
+  (c/defn fetch-when+state
+    "Returns an invisible item, that will execute the given request once
+  if `cond` is true, and also whenever `cond` changes from false to
+  true. Updates its state to a tuple of the response and a loading flag:
+  - `true` when a request is started, but hasn't completed yet
+  - `false` when a request is completed.
+  Initialize the state to false or nil."
+    [req cond]
+    (c/with-state-as [resp cond-c :local false]
+      (c/fragment
+       (c/focus lens/second (c/init cond))
+       (if cond-c
+         ;; refetch:
+         (c/focus lens/first
+                  (c/fragment (c/focus lens/second (c/init true))
+                              (fetch-once req handler)))
+         c/empty)))))
+
+(defn fetch-when
+  "Returns an invisible item, that will execute the given request once
+  if `cond` is true, and also whenever `cond` changes from false to
+  true. Updates its state to the response value after each request
+  completed (successful or not)."
+  [req cond]
+  (c/local-state nil (fetch-when+state req cond)))
 
 (defn throw-response-error [error]
   ;; error = {:status ...}

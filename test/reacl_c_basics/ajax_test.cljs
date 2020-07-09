@@ -4,6 +4,7 @@
             [reacl-c.dom :as dom]
             [reacl-c.test-util.core :as tu :include-macros true]
             [active.clojure.functions :as f]
+            [active.clojure.lens :as lens]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
 
 (defn after [ms thunk]
@@ -108,6 +109,47 @@
                  ;; do not fetch when some state.
                  (is (= (c/return)
                         (tu/mount! env resp))))))
+
+(deftest fetch-when+state-test
+  ;; fetch-when puts the response into a slot in the state, and refetches on condition.
+  (let [resp (ajax/ok-response :value)
+        env (tu/env (c/with-state-as [resp fetch?]
+                      (c/focus lens/first
+                               (ajax/fetch-when+state (ajax/GET "/url") fetch?))))]
+    (tu/provided [ajax/execute (execute-dummy resp)]
+                 ;; fetch when state nil
+                 (is (= (c/return :state [[resp false] true])
+                        (tu/mount! env [[nil nil] true])))
+                 
+                 ;; do not fetch when some state.
+                 (is (= (c/return)
+                        (tu/mount! env [[nil nil] false])))
+
+                 ;; fetch once later.
+                 (is (= (c/return :state [[resp false] true])
+                        (tu/update! env [[nil nil] true])))
+
+                 ;; and refetch maybe.
+                 (is (= (c/return)
+                        (tu/update! env [[resp nil] false])))
+                 ;; Note: the :state update would be optimized away,
+                 ;; when the response is identical (it does another
+                 ;; fetch nevertheless, but in this test we need a
+                 ;; different response):
+                 (let [resp2 (ajax/ok-response :value2)]
+                   (tu/provided [ajax/execute (execute-dummy resp2)]
+                                (is (= (c/return :state [[resp2 false] true])
+                                       (tu/update! env [[resp nil] true])))))
+                 )
+    ;; and when request is not completed, loading state stays true
+    (tu/provided [ajax/execute (constantly c/empty)]
+                 (is (= (c/return :state [[nil true] true])
+                        (tu/mount! env [[nil nil] true]))))
+
+    ;; fetch-when is just fetch-when+state without the loading-state.
+    (is (= (ajax/fetch-when (ajax/GET "/url") true)
+           (c/local-state nil (ajax/fetch-when+state (ajax/GET "/url") true))))
+    ))
 
 ;; TODO show-response-value ?
 
