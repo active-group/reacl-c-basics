@@ -21,7 +21,7 @@
   [pages]
   (history-router (history/html5-history) pages))
 
-(c/defn goto
+(defn goto
   "Returns an action that causes the browser to go to the given
   path. Must be emitted from an item below a history-router item."
   [path]
