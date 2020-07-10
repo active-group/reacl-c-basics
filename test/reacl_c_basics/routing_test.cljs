@@ -1,18 +1,19 @@
 (ns reacl-c-basics.routing-test
-  (:require [reacl-c-basics.routing :as routing]
+  (:require [reacl-c-basics.pages.core :as routing]
             [reacl-c.core :as c]
             [reacl-c.dom :as dom]
             [reacl-c.test-util.core :as tu :include-macros true]
-            [reacl-basics.pages.routes :as routes :include-macros true]
-            [reacl-basics.pages.history :as history]
+            [reacl-c-basics.pages.routes :as routes :include-macros true]
+            [reacl-c-basics.pages.history :as history]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
 
 (deftest history-router-test
-  (routes/clear-routes!)
+  (routes/defroutes all-routes
+    (routes/defroute home "/home")
+    (routes/defroute person "/person/:id"))
 
-  (routes/defroute home "/home")
-  (routes/defroute person "/person/:id")
-
+  (is (= all-routes #{home person}))
+  
   (let [home-page (fn [] (c/dynamic #(dom/div "Homepage " %)))
         person-page (fn [id & [params]]
                       (dom/div "Person: " (str id) " " (str (:a params))))
@@ -55,9 +56,9 @@
              
              ;; emulate a user click on an anchor to go to person page:
              (js/window.setTimeout
-                (fn []
-                  (@hist-nav! "/person/123?a=42")
-                  (is (= ["Person: 123 42"]
-                         (map dom-content (doms-with-tag (dom/div)))))
-                  (done))
-                0)))))
+              (fn []
+                (@hist-nav! "/person/123?a=42")
+                (is (= ["Person: 123 42"]
+                       (map dom-content (doms-with-tag (dom/div)))))
+                (done))
+              0)))))
