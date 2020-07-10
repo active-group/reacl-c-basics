@@ -104,7 +104,7 @@
 
 (def ^:no-doc current-routes (atom nil)) ;; used in macro generated code.
 
-(defmacro defroutes ;; TODO: add variant with a prefix.
+(defmacro defroutes ;; TODO: add variant with a prefix, or a (context ...) macro?.
   [name & defs]
   `(do
      (reset! current-routes #{})

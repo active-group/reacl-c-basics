@@ -5,6 +5,7 @@
             [reacl-c.test-util.core :as tu :include-macros true]
             [reacl-c-basics.pages.routes :as routes :include-macros true]
             [reacl-c-basics.pages.history :as history]
+            [reacl-basics.pages.history :as rhistory]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
 
 (deftest history-router-test
@@ -29,7 +30,7 @@
            (let [hist-nav! (atom nil)
                  current-path (atom "/home")
                  test-history
-                 (reify history/History
+                 (reify rhistory/History
                    (push! [_ path]
                      (reset! current-path path))
                    (get-current [_]
