@@ -159,34 +159,74 @@
   (input-value dom/select {}
                [attrs (select-opt-list options)]))
 
-(defn select-string [& args]
-  (let [[attrs options] (core/split-dom-attrs args)]
-    (select-string* attrs options)))
-
 ;; select and options, extended to work with arbitrary clojure values.
-(defn- pr-str-lens
-  ([values v] (pr-str v))
+(defn- option-value-lens
+  ([values v]
+   (if (contains? values v)
+     (pr-str v)
+     v))
   ([values p s] (if-let [l (not-empty (filter #(= s (pr-str %)) values))]
                   (first l)
                   ;; selected value not in list? keep previous
                   p)))
 
-(defn select [& args]
-  ;; Note: use select-string if options are strings already (much faster)
+(defrecord ^:private Option [attrs args])
+(defrecord ^:private OptGroup [attrs args])
+
+(defn- map-option-tags [options f]
+  (map (fn [opt]
+         (cond
+           (instance? Option opt)
+           (apply dom/option (update (:attrs opt) :value f) (:args opt))
+
+           (instance? OptGroup opt)
+           (apply dom/optgroup (:attrs opt) (map-option-tags (:args opt) f))
+
+           ;; don't mess with reacl-c internal representation of other things:
+           :else opt))
+       options))
+
+(defn- get-option-values [options]
+  (mapcat (fn [opt]
+            (cond
+              (instance? Option opt) [(:value (:attrs opt))]
+
+              (instance? OptGroup opt) (get-option-values (:args opt))
+
+              ;; don't mess with reacl-c internal representation of other things:
+              :else nil))
+          options))
+
+(c/defn select-string
+  "Like [[dom/select]], but the selected (string) value is the state
+  of the returned item."
+  [& args]
+  (let [[attrs options] (core/split-dom-attrs args)]
+    (select-string* attrs (map-option-tags options identity))))
+
+(c/defn select
+  "Like dom/select, but with the selected value as the state of the
+  returned item, and if [[option]] and [[optgroup]] are used, then
+  this works with (almost) arbitrary clojure values as selectalbe
+  values. See [[select-string]] if the values are only strings."
+  [& args]
   (let [[attrs options] (core/split-dom-attrs args)
-        values (map (fn [opt]
-                      ;; TODO: add dom/element-attrs, element-type or something? as a lens?
-                      (assert (= "option" (:type opt)))
-                      (:value (:attrs opt)))
-                    options)
-        _ (assert (= (count values) (count (set (map pr-str values)))) "Two or more options have the same 'pr-str' representation.")
-        options_ (map (fn [opt] (update-in opt [:attrs :value] pr-str))
-                      options)]
-    (c/focus (f/partial pr-str-lens values)
+        values (get-option-values options)
+        options_ (map-option-tags options pr-str)]
+    (c/focus (f/partial option-value-lens (set values))
              (select-string* attrs options_))))
 
-(defn option [& args]
-  (apply dom/option args))
+(defn option
+  "Like dom/option, but can only be used for [[select]] or [[select-string]]."
+  [attrs & args]
+  (assert (and (map? attrs) (contains? attrs :value)))
+  (Option. attrs args))
+
+(defn optgroup
+  "Like dom/optgroup, but can only be used for [[select]] or [[select-string]]."
+  [& args]
+  (let [[attrs args] (core/split-dom-attrs args)]
+    (OptGroup. attrs args)))
 
 (core/defn-dom submit-button [attrs & content]
   (apply dom/button (merge {:type "submit"} attrs)
