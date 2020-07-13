@@ -197,14 +197,16 @@
               :else nil))
           options))
 
-(c/defn select-string
+;; Note: we get into an (IFn?) arity problem when using c/defn here :-/
+(defn select-string
   "Like [[dom/select]], but the selected (string) value is the state
   of the returned item."
   [& args]
   (let [[attrs options] (core/split-dom-attrs args)]
     (select-string* attrs (map-option-tags options identity))))
 
-(c/defn select
+;; Note: we get into an (IFn?) arity problem when using c/defn here :-/
+(defn select
   "Like dom/select, but with the selected value as the state of the
   returned item, and if [[option]] and [[optgroup]] are used, then
   this works with (almost) arbitrary clojure values as selectalbe
