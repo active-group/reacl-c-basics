@@ -7,7 +7,7 @@
 (defn- checked-state [_ e]
   (.. e -target -checked))
 
-(c/defn checkbox [& args]
+(c/defn-item checkbox [& args]
   (c/with-state-as checked
     (let [[attrs children] (core/split-dom-attrs args)]
       (apply dom/input (merge {:type "checkbox"
@@ -16,7 +16,7 @@
                               attrs)
              children))))
 
-(c/defn radio [& args]
+(c/defn-item radio [& args]
   (let [[attrs children] (core/split-dom-attrs args)]
     (apply checkbox (merge {:type "radio"}
                            attrs)
@@ -25,7 +25,7 @@
 (defn- value-state [_ e]
   (c/return :state (.. e -target -value)))
 
-(c/defn ^:private input-value [f fixed-attrs args]
+(c/defn-item ^:private input-value [f fixed-attrs args]
   (c/with-state-as value
     ;; Note: args must not be var-args, to workaround various (!) clojurescript bugs with >= 21 args and IFns.
     (let [[attrs children] (core/split-dom-attrs args)]
@@ -46,7 +46,7 @@
          v (parse mod-text)]
      [v mod-text])))
 
-(c/defn ^:no-doc input-parsed* [parse restrict & args]
+(c/defn-item ^:no-doc input-parsed* [parse restrict & args]
   (c/with-state-as [value text]
     ;; state = [value text] on the currently parsed value (or nil if not possible), and the actual text entered/shown.
     ;; (parse string) => value
@@ -81,7 +81,7 @@
                                          (assoc 0 (parse (get-in state [1 :text])))
                                          ))
                       (c/return :action a)))]
-  (c/defn ^:no-doc input-parsed [parse unparse restrict & args]
+  (c/defn-item ^:no-doc input-parsed [parse unparse restrict & args]
     (c/with-state-as value
       ;; this keeps the text the user entered, iff and as long as the input has the focus, and changes it to (unparse value) otherwise.
       ;; Note: use input-parsed* if you need to distinguish between 'no input' and 'invalid input'.
@@ -110,7 +110,7 @@
 (defn- unrestricted [old new]
   new)
 
-(c/defn input-number [& args]
+(c/defn-item input-number [& args]
   (let [[attrs content] (core/split-dom-attrs args)]
     (apply input-parsed parse-number unparse-number unrestricted
            (merge {:type "number"}
@@ -137,7 +137,7 @@
 (defn ^:no-doc restrict-int [old new]
   (apply str (filter #(.test #"[0-9-]" %) new)))
 
-(c/defn input-int [& args]
+(c/defn-item input-int [& args]
   (let [[attrs content] (core/split-dom-attrs args)]
     (apply input-parsed parse-int unparse-int
            ;; Note with type 'number' we don't even see a lot of the 'invalid' inputs; so restrict-int makes only sense for :text
@@ -152,7 +152,7 @@
 (defn textarea [& args]
   (input-value dom/textarea {} args))
 
-(c/defn ^:private select-opt-list :static [options]
+(c/defn-item ^:private select-opt-list :static [options]
   (apply c/fragment options))
 
 (defn- select-string* [attrs options]
@@ -197,7 +197,7 @@
               :else nil))
           options))
 
-;; Note: we get into an (IFn?) arity problem when using c/defn here :-/
+;; Note: we get into an (IFn?) arity problem when using c/defn-item here :-/
 (defn select-string
   "Like [[dom/select]], but the selected (string) value is the state
   of the returned item."
@@ -205,7 +205,7 @@
   (let [[attrs options] (core/split-dom-attrs args)]
     (select-string* attrs (map-option-tags options identity))))
 
-;; Note: we get into an (IFn?) arity problem when using c/defn here :-/
+;; Note: we get into an (IFn?) arity problem when using c/defn-item here :-/
 (defn select
   "Like dom/select, but with the selected value as the state of the
   returned item, and if [[option]] and [[optgroup]] are used, then
@@ -242,7 +242,7 @@
   (.preventDefault ev)
   (f value))
 
-(c/defn form [attrs & content]
+(c/defn-item form [attrs & content]
   ;; :onreset a (c/return) value, automatically added when a :default is set.
   ;; :onsubmit a (fn [value]) => (c/return).
   (apply dom/form
@@ -253,7 +253,7 @@
            (:onsubmit attrs) (assoc :onsubmit (f/partial submitter (:onsubmit attrs))))
          content))
 
-(c/defn local-form [& args]
+(c/defn-item local-form [& args]
   ;; :default should be the default state value.
   ;; :onsubmit should be a fn of submitted value => return
   ;; :onreset is added and resets to the default value.

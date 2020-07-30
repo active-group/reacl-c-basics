@@ -36,7 +36,7 @@
                       Goto (c/return :action (history/push! history (:uri a))
                                      :state (assoc state 1 (:uri a)))
                       (c/return :action a)))]
-  (c/defn history-router
+  (c/defn-item history-router
     "Returns an item class that dispatches rendering based on the
   given map of routes to pages, where the current route and route
   changes are managed by the given implementation of

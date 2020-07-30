@@ -11,7 +11,7 @@
                           :state {:dirty nil
                                   :previous nil
                                   :outgoing nil}))]
-  (c/defn ^:private publisher [f]
+  (c/defn-item ^:private publisher [f]
     (c/with-state-as {dirty :dirty}
       (if dirty
         ;; we want to enforce a restart of the publisher everytime something changes; so add a (random) key:
@@ -36,7 +36,7 @@
                                 (opt-resolve current (:state a))
                                 (:state a)))
                     (c/return :action a)))]
-  (c/defn ^:private debouncer [item f opt-resolve]
+  (c/defn-item ^:private debouncer [item f opt-resolve]
     (c/with-state-as outer-1
       ;; respect to the beginning of the delay, and add an optional fn to
       ;; resolve such a conflict.

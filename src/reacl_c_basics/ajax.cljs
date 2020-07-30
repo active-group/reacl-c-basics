@@ -98,7 +98,7 @@
 (let [handler (fn [_ response]
                 (assert (response? response))
                 (c/return :state response))]
-  (c/defn fetch
+  (c/defn-item fetch
     "Returns an invisible item, that will
   execute the given request whenever its state is or becomes nil, and
   set its state to the success or error response as soon as
@@ -111,7 +111,7 @@
 
 (let [handler (fn [_ response]
                 (c/return :state [response false]))]
-  (c/defn fetch-when+state
+  (c/defn-item fetch-when+state
     "Returns an invisible item, that will execute the given request once
   if `cond` is true, and also whenever `cond` changes from false to
   true. Updates its state to a tuple of the response and a loading flag:
@@ -213,7 +213,7 @@
                           [ret state] (ret-state (f state job) state)]
                       (base/merge-returned (c/return :state [state nil]) ;; nil to remove it from queue
                                            ret)))]
-  (c/defn job-executor [f]
+  (c/defn-item job-executor [f]
     (c/with-state-as [st job]
       (case (delivery-job-status job)
         :pending (c/once (f/partial ->running f))
