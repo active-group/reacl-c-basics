@@ -1,4 +1,4 @@
-(defproject de.active-group/reacl-c-basics "0.9.0-SNAPSHOT"
+(defproject de.active-group/reacl-c-basics "0.9.0"
   :description "Library with utilities often useful when writing web applications with Reacl-C."
   
   :url "http://github.com/active-group/reacl-c-basics"
@@ -9,9 +9,10 @@
   :dependencies [[org.clojure/clojure "1.9.0" :scope "provided"]
                  [org.clojure/clojurescript "1.10.238" :scope "provided"]
                  [reacl "2.2.5"]
-                 [de.active-group/reacl-c "0.9.0-SNAPSHOT"]
+                 [de.active-group/reacl-c "0.9.0"]
                  [de.active-group/reacl-basics "0.1.2"]
-                 [cljs-ajax "0.7.5"]]
+                 [cljs-ajax "0.7.5"]
+                 [clj-commons/cljss "1.6.4" :scope "provided"]]
 
   :plugins [[lein-codox "0.10.7"]
             [lein-auto "0.1.3"]]
