@@ -250,19 +250,27 @@
                                (-> (c/focus (f/partial job-lens id)
                                             (job-executor f))
                                    (c/keyed (str id))))
-                             (map delivery-job-id queue))))]
+                             (map delivery-job-id queue))))
+      manage-queue (fn [manage queue]
+                     (if manage
+                       (c/init (manage queue))
+                       c/empty))]
   (defn delivery
     "Returns an item that manages execution of Ajax requests in its
   local state. Use [[deliver]] to get an action that can be emitted by
   `item` that adds a new delivery job to an internal queue.
 
   Jobs transition from a :pending state, over :running
-  into :completed (successful or not), and for each transition `(f
-  state job)` is evaluated, which must return
-  a [[reacl-c.core/return]] value."
-    [item & [f]]
+  into :completed (successful or not), and for each transition `(transition
+  state job)` is evaluated on the returned items state, and which can modify it.
+
+  Some control over the queue can be achieved by specifying `manage`
+  which is called on the queue after it changed and must return an
+  updated queue. Newest items are at the end of the queue."
+    [item & [transition manage]]
     (c/local-state []
                    (c/fragment
-                    (c/dynamic (f/partial run-jobs f))
+                    (c/focus lens/second (c/dynamic (f/partial manage-queue manage)))
+                    (c/dynamic (f/partial run-jobs transition))
                     (c/handle-action (c/focus lens/first item)
-                                     (f/partial add-jobs (or f (f/constantly (c/return)))))))))
+                                     (f/partial add-jobs (or transition (f/constantly (c/return)))))))))
