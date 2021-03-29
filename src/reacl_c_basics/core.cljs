@@ -2,6 +2,8 @@
   (:require [reacl-c.dom :as dom]
             [reacl-c.core :as c :include-macros true]))
 
+;; TODO: add merge-attributes?
+
 (defn ^:no-doc split-dom-attrs [args]
   (if (and (not-empty args)
            (dom/dom-attributes? (first args)))
@@ -38,3 +40,29 @@
                                   ms)]
     (fn []
       (js/window.clearInterval id))))
+
+(c/defn-subscription intersection-change
+  "Returns a subscription item to intersection information for the
+  given dom element, as of the IntersectionObserver API."
+  deliver! [elem options]
+  ;; TODO: on a native dom elem?
+  (let [obs (new js/IntersectionObserver
+                 (fn [changes]
+                   (doseq [change (array-seq changes)]
+                     (deliver! (js->clj change))))
+                 #js {:root (:root options)
+                      :rootMargin (:root-margin options)
+                      :treshold (to-array (:threshold options))})]
+    (.observe obs elem)
+    (fn []
+      (.unobserve obs elem)
+      (.disconnect obs))))
+
+(defn visibility-change
+  "Returns a subscription item that emits true or false, when the
+  given dom element becomes visible or invisible to the user in the
+  browser window."
+  [elem & [options]]
+  (-> (intersection-change elem
+                           options)
+      (c/map-actions :isIntersecting)))
