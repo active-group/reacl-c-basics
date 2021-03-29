@@ -2,19 +2,20 @@
   (:require [reacl-c-basics.ajax-test-util :as ajax-tu]
             [reacl-c-basics.ajax :as ajax]
             [reacl-c.core :as c :include-macros true]
-            [reacl-c.test-util.core :as tu :include-macros true]
+            [reacl-c.test-util.test-renderer :as tu]
+            [reacl-c.test-util.core :as tuc]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
 
 (deftest request-subscribe-effect-test
   (let [req (ajax/GET "http://invalid.invalid/url")
         sub-eff (let [r (atom nil)]
                   (tu/mount! (tu/env (-> (ajax/execute req)
-                                         (tu/emulate-subscriptions (fn [sub-eff]
-                                                                     (reset! r sub-eff)
-                                                                     c/no-effect))))
+                                         (tuc/emulate-subscriptions (fn [sub-eff]
+                                                                      (reset! r sub-eff)
+                                                                      c/no-effect))))
                              nil)
                   @r)]
-    (is (is (tu/subscribe-effect? sub-eff (ajax/execute req))))
+    (is (is (tuc/subscribe-effect? sub-eff (ajax/execute req))))
     (is (ajax-tu/request-subscribe-effect? sub-eff))
     (is (ajax-tu/request-subscribe-effect? sub-eff req))
     (is (= req (ajax-tu/request-subscribe-effect-request sub-eff)))))

@@ -1,0 +1,12 @@
+{
+ ;; use source-paths and dependencies from leiningen project.clj:
+ :lein {:profiles "shadow"}
+ :builds {:test {:target :browser-test
+                 :test-dir "target/public/test"
+                 :devtools {:hud #{:errors :warnings :progress}
+                            :http-port          9500
+                            :http-root          "target/public/test"}}
+          :ci {:target :karma
+               :output-to "target/ci.js"}
+          }
+ }

@@ -1,6 +1,5 @@
 (ns reacl-c-basics.ajax
   (:require [reacl-c.core :as c :include-macros true]
-            [reacl-c.base :as base]
             [reacl-c.dom :as dom]
             [active.clojure.cljs.record :as r :include-macros true]
             [active.clojure.functions :as f]
@@ -193,26 +192,26 @@
     a))
 
 (defn- ret-state [ret state]
-  (if (not (base/returned? ret))
-    ;; Note: must be a returned, but let reacl-c complain in the ordinary way.
-    [ret state]
-    (let [st (base/returned-state ret)]
-      (if (= st base/keep-state)
+  ;; TODO: try this without mangling with returned objects; should be possible without.
+  (if (not (c/returned? ret))
+    [(c/return) ret]
+    (let [st (c/returned-state ret)]
+      (if (= st c/keep-state)
         [ret state]
-        [(lens/shove ret base/returned-state base/keep-state) st]))))
+        [(lens/shove ret c/returned-state c/keep-state) st]))))
 
 (let [->running (fn [f [state job]]
                   (let [job (lens/shove job delivery-job-status :running)
                         [ret state] (ret-state (f state job) state)]
-                    (base/merge-returned (c/return :state [state job])
-                                         ret)))
+                    (c/merge-returned (c/return :state [state job])
+                                      ret)))
       ->completed (fn [f [state job] resp]
                     (let [job (-> job
                                   (lens/shove delivery-job-status :completed)
                                   (lens/shove delivery-job-response resp))
                           [ret state] (ret-state (f state job) state)]
-                      (base/merge-returned (c/return :state [state nil]) ;; nil to remove it from queue
-                                           ret)))]
+                      (c/merge-returned (c/return :state [state nil]) ;; nil to remove it from queue
+                                        ret)))]
   (c/defn-item job-executor [f]
     (c/with-state-as [st job]
       (case (delivery-job-status job)
@@ -224,8 +223,8 @@
 (let [->pending (fn [f [state queue] job]
                   ;; run :pending
                   (let [[ret state] (ret-state (f state job) state)]
-                    (base/merge-returned (c/return :state [state (conj queue job)])
-                                         ret)))
+                    (c/merge-returned (c/return :state [state (conj queue job)])
+                                      ret)))
       add-jobs (fn [f [state queue] a]
                  (if (delivery-job? a)
                    (->pending f [state queue] (ensure-id! a))

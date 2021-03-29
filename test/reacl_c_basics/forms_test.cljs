@@ -2,7 +2,7 @@
   (:require [reacl-c-basics.forms :as forms]
             [reacl-c.core :as c]
             [reacl-c.dom :as dom]
-            [reacl-c.test-util.core :as tu]
+            [reacl-c.test-util.test-renderer :as tu]
             [cljs.test :refer (is deftest testing) :include-macros true]))
 
 (deftest form-test

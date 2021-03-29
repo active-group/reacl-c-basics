@@ -2,7 +2,8 @@
   (:require [reacl-c-basics.ajax :as ajax]
             [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom]
-            [reacl-c.test-util.core :as tu :include-macros true]
+            [reacl-c.test-util.core :as tuc :include-macros true]
+            [reacl-c.test-util.test-renderer :as tu]
             [active.clojure.functions :as f]
             [active.clojure.lens :as lens]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
@@ -102,13 +103,13 @@
   ;; fetch puts the response into a slot in the state.
   (let [resp (ajax/ok-response :value)
         env (tu/env (ajax/fetch (ajax/GET "/url")))]
-    (tu/provided [ajax/execute (execute-dummy resp)]
-                 ;; fetch when state nil
-                 (is (= (c/return :state resp)
-                        (tu/mount! env nil)))
-                 ;; do not fetch when some state.
-                 (is (= (c/return)
-                        (tu/mount! env resp))))))
+    (tuc/provided [ajax/execute (execute-dummy resp)]
+                  ;; fetch when state nil
+                  (is (= (c/return :state resp)
+                         (tu/mount! env nil)))
+                  ;; do not fetch when some state.
+                  (is (= (c/return)
+                         (tu/mount! env resp))))))
 
 (deftest fetch-when+state-test
   ;; fetch-when puts the response into a slot in the state, and refetches on condition.
@@ -116,35 +117,35 @@
         env (tu/env (c/with-state-as [resp fetch?]
                       (c/focus lens/first
                                (ajax/fetch-when+state (ajax/GET "/url") fetch?))))]
-    (tu/provided [ajax/execute (execute-dummy resp)]
-                 ;; fetch when state nil
-                 (is (= (c/return :state [[resp false] true])
-                        (tu/mount! env [[nil nil] true])))
+    (tuc/provided [ajax/execute (execute-dummy resp)]
+                  ;; fetch when state nil
+                  (is (= (c/return :state [[resp false] true])
+                         (tu/mount! env [[nil nil] true])))
                  
-                 ;; do not fetch when some state.
-                 (is (= (c/return)
-                        (tu/mount! env [[nil nil] false])))
+                  ;; do not fetch when some state.
+                  (is (= (c/return)
+                         (tu/mount! env [[nil nil] false])))
 
-                 ;; fetch once later.
-                 (is (= (c/return :state [[resp false] true])
-                        (tu/update! env [[nil nil] true])))
+                  ;; fetch once later.
+                  (is (= (c/return :state [[resp false] true])
+                         (tu/update! env [[nil nil] true])))
 
-                 ;; and refetch maybe.
-                 (is (= (c/return)
-                        (tu/update! env [[resp nil] false])))
-                 ;; Note: the :state update would be optimized away,
-                 ;; when the response is identical (it does another
-                 ;; fetch nevertheless, but in this test we need a
-                 ;; different response):
-                 (let [resp2 (ajax/ok-response :value2)]
-                   (tu/provided [ajax/execute (execute-dummy resp2)]
-                                (is (= (c/return :state [[resp2 false] true])
-                                       (tu/update! env [[resp nil] true])))))
-                 )
+                  ;; and refetch maybe.
+                  (is (= (c/return)
+                         (tu/update! env [[resp nil] false])))
+                  ;; Note: the :state update would be optimized away,
+                  ;; when the response is identical (it does another
+                  ;; fetch nevertheless, but in this test we need a
+                  ;; different response):
+                  (let [resp2 (ajax/ok-response :value2)]
+                    (tuc/provided [ajax/execute (execute-dummy resp2)]
+                                  (is (= (c/return :state [[resp2 false] true])
+                                         (tu/update! env [[resp nil] true])))))
+                  )
     ;; and when request is not completed, loading state stays true
-    (tu/provided [ajax/execute (constantly c/empty)]
-                 (is (= (c/return :state [[nil true] true])
-                        (tu/mount! env [[nil nil] true]))))
+    (tuc/provided [ajax/execute (constantly c/empty)]
+                  (is (= (c/return :state [[nil true] true])
+                         (tu/mount! env [[nil nil] true]))))
 
     ;; fetch-when is just fetch-when+state without the loading-state.
     (is (= (ajax/fetch-when (ajax/GET "/url") true)
@@ -177,14 +178,14 @@
       (let [states (atom [])
             env (mk-env states)]
         ;; Note: it completes immediately, because of our fetch-once-dummy
-        (tu/provided [ajax/execute (execute-dummy resp)]
-                     (tu/mount! env [])
+        (tuc/provided [ajax/execute (execute-dummy resp)]
+                      (tu/mount! env [])
 
-                     (let [r (tu/inject-action! (tu/find-named env program)
-                                                job)]
-                       ;; currently not properly testable, due to limitation/bug of the React test-renderer.
-                       #_(is (= (c/return :state [:pending :running :completed])
-                                r)))
-                     ;; will go immediately from pending to running.
-                     (is (= [:pending :running :completed]
-                            @states)))))))
+                      (let [r (tu/inject-action! (tu/find-named env program)
+                                                 job)]
+                        ;; currently not properly testable, due to limitation/bug of the React test-renderer.
+                        #_(is (= (c/return :state [:pending :running :completed])
+                                 r)))
+                      ;; will go immediately from pending to running.
+                      (is (= [:pending :running :completed]
+                             @states)))))))

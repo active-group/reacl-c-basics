@@ -2,7 +2,7 @@
   (:require [reacl-c-basics.pages.core :as routing]
             [reacl-c.core :as c]
             [reacl-c.dom :as dom]
-            [reacl-c.test-util.core :as tu :include-macros true]
+            [reacl-c.test-util.test-renderer :as tu]
             [reacl-c-basics.pages.routes :as routes :include-macros true]
             [reacl-c-basics.pages.history :as history]
             [reacl-basics.pages.history :as rhistory]
