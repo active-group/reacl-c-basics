@@ -43,21 +43,21 @@
   (is (= 42 (run-sync (p/return 42))))
   (is (= nil (run-sync (p/return nil) :init))))
 
-(deftest bind-test-1
+(deftest then-test-1
   (is (= "42"
          (run-sync
-          (p/bind (p/return "4")
+          (p/then (p/return "4")
                   (fn [s]
                     (p/return (str s "2"))))))))
 
-(deftest bind-test-2
+(deftest then-test-2
   (is (= "42xy"
          (run-sync
-          (p/bind (p/bind (p/return "4")
+          (p/then (p/then (p/return "4")
                           (fn [s]
                             (p/return (str s "2"))))
                   (fn [s]
-                    (p/bind (p/return "x")
+                    (p/then (p/return "x")
                             (fn [s2]
                               (p/return (str s s2 "y"))))))))))
 
@@ -105,11 +105,11 @@
         ord (atom [])]
     (is (= 21
            (run-sync
-            (p/sequ (p/bind (p/return 42) (fn [r]
+            (p/sequ (p/then (p/return 42) (fn [r]
                                             (swap! ord conj :p1)
                                             (reset! r1 r)
                                             (p/return nil)))
-                    (p/bind (p/return nil) (fn [r]
+                    (p/then (p/return nil) (fn [r]
                                              (swap! ord conj :p2)
                                              (p/return 21)))))))
     ;; p1 did run, but p2 came after it
@@ -121,7 +121,7 @@
   ;; can run the same program twice
   (let [cnt (atom 0)
         foo (c/effect (fn [] (swap! cnt inc)))
-        p (p/bind (p/return nil)
+        p (p/then (p/return nil)
                   (fn [r]
                     (p/wrap (fn [item]
                               (c/fragment item
@@ -150,7 +150,7 @@
   (let [run? (atom false)]
     (dt/rendering
      (p/run-button
-      {:program (p/bind (p/return "42")
+      {:program (p/then (p/return "42")
                         (fn [v]
                           (reset! run? true)
                           (p/return nil)))}
@@ -167,7 +167,7 @@
   
   (let [p (p/return 42)
         k (constantly (p/return 0))]
-    (is (= (p/bind p k) (p/bind p k))))
+    (is (= (p/then p k) (p/then p k))))
 
   (let [p1 (p/return 42)
         p2 (p/return 21)]
@@ -203,7 +203,6 @@
                  (js/window.removeEventListener "error" eh)))))
 
 (let [eh (fn [ev]
-           #_(js/console.log "not logging:" ev)
            (.preventDefault ev))
       inst (c/effect (fn []
                        (js/window.addEventListener "error" eh)))
@@ -276,7 +275,7 @@
                   (run-async (with-size-of-component-structure
                                (fn [k]
                                  (apply p/sequ (concat (repeat N (p/return 0))
-                                                       [(p/bind (p/return nil) k)]))))
+                                                       [(p/then (p/return nil) k)]))))
                              
                              nil :init 1000))]
     #_(preventing-error-log-async

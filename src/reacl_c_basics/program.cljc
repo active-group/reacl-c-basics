@@ -86,40 +86,40 @@
 (defn jump-once [program]
   (c/init (c/return :action (jump program))))
 
-(letfn [(bind-p1-done [st result]
+(letfn [(then-p1-done [st result]
           (c/return :state [(first st) (done result)]))
-        (bind-run [[_ p1-result] program cont]
+        (then-run [[_ p1-result] program cont]
           (if-not (done? p1-result)
             (-> (running program)
-                (handle-result bind-p1-done))
+                (handle-result then-p1-done))
             (running (cont (done-result p1-result)))))]
-  (defn- simple-bind
+  (defn- simple-then
     [program cont]
     (eager
      (c/local-state nil
-                    (c/dynamic bind-run program cont))
+                    (c/dynamic then-run program cont))
      (not-running program))))
 
-(letfn [(bind-k [cont _ result] (c/return :action (jump (cont result))))]
-  (defn- tailrec-bind
+(letfn [(then-k [cont _ result] (c/return :action (jump (cont result))))]
+  (defn- tailrec-then
     [program cont]
     (eager
-     ;; the first program runs on it's own trampoine, the continuation
-     ;; is 'thrown' to the trampoline running this bind.
+     ;; the first program runs on its own trampoine, the continuation
+     ;; is 'thrown' to the trampoline running this.
      (-> (run-on-trampoline program)
-         (handle-result (f/partial bind-k cont)))
+         (handle-result (f/partial then-k cont)))
      (not-running program))))
 
-(def ^:private use-trampoline? true) ;; makes binds resp. sequ tail-recursive.
+(def ^:private use-trampoline? true) ;; makes thens resp. sequ tail-recursive.
 
-(defn bind ;; TODO: rename 'then' ?
+(defn then ;; TODO: rename 'then' ?
   "A program that runs `program` first, and then the program `(cont
   result)`, where `result` is the result of the first program."
   [program cont]
   (assert (program? program) program)
   (if use-trampoline?
-    (tailrec-bind program cont)
-    (simple-bind program cont)))
+    (tailrec-then program cont)
+    (simple-then program cont)))
 
 (c/defn-item runner
   "An item that runs the given program once, offering an event handler
@@ -156,7 +156,7 @@
 (defn fmap
   "A program that applies f to the result of the given program."
   [f program]
-  (bind program (f/comp return f)))
+  (then program (f/comp return f)))
 
 (let [check-state (fn [done-state? st]
                     (if (done-state? st)
@@ -206,7 +206,7 @@
     [program & programs]
     (if (empty? programs)
       program
-      (bind program (f/partial k sequ programs)))))
+      (then program (f/partial k sequ programs)))))
 
 #?(:cljs
    (defn sleep
@@ -290,7 +290,7 @@
 
     :else
     (cond
-      (vector? form) `(bind ~(second form) (fn [~(first form)] (do-program ~@forms)))
+      (vector? form) `(then ~(second form) (fn [~(first form)] (do-program ~@forms)))
       :else `(sequ ~form (do-program ~@forms)))))
 
 #?(:cljs
