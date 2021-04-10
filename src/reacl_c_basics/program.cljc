@@ -5,8 +5,11 @@
             #?(:cljs [reacl-c.dom :as dom :include-macros true])
             #?(:cljs [active.clojure.cljs.record :as r :include-macros true])
             #?(:clj [active.clojure.record :as r])
+            #?(:cljs [reacl-c-basics.core :as core])
             [active.clojure.functions :as f]
             [active.clojure.lens :as lens]))
+
+;; Note: items are usually nouns, but programs are usually best named with verbs.
 
 (r/define-record-type ^{:rtd-record? true :private true} Done
   (done result) done?
@@ -46,13 +49,9 @@
    (c/init (c/return :action (done v)))
    c/empty))
 
-(defn block "A program that shows the given item, but never completes." [item]
+(defn show "A program that just shows the given item, but never completes."
+  [item]
   (eager item item))
-
-;; Note:
-;; (p/race (p/block "Foo")
-;;         (p/return :b))
-;; is like 'show this and return immediately'
 
 (defn- handle-result [item f]
   (-> item
@@ -68,16 +67,18 @@
             (-> (running program)
                 (handle-result bind-p1-done))
             (running (cont (done-result p1-result)))))]
-  (defn bind
+  (defn bind ;; TODO: rename 'then' ?
     "A program that runs `program` first, and then the program `(cont
   result)`, where `result` is the result of the first program."
     [program cont]
+    ;; TODO: add to docu that cont may be run multiple times?
+    ;; TODO: is it tail recursive? should be if possible.
     (eager
      (c/local-state nil
                     (c/dynamic bind-run program cont))
      (not-running program))))
 
-(c/defn-item run
+(c/defn-item run ;; TODO: rename as a noun - runner ? executor? once ?
   "An item that runs the given program once, offering an event handler
   for handling the result of the program."
   [program & [handle-result-f]]
@@ -86,6 +87,11 @@
                        (if (some? handle-result-f)
                          (handle-result-f state r)
                          (c/return))))))
+
+;; TODO ?
+#_(c/defn-item mutator [f]
+  ;; run program (f state), setting state on done, then restart immediately
+  )
 
 (defn wrap*
   "A program wrapped in some additional markup, via `(f item running?)`,
@@ -158,6 +164,15 @@
     (if (empty? programs)
       program
       (bind program (f/partial k sequ programs)))))
+
+#?(:cljs
+   (defn sleep
+     "A program that returns `nil` after the given number of milliseconds
+  have elapsed."
+     [ms]
+     (eager (c/handle-action (core/timeout ms)
+                             (f/constantly (c/return :action (done nil))))
+            c/empty)))
 
 (defn- par-base [programs run-p]
   (eager

@@ -19,7 +19,7 @@
      (fn [env]
        @result))))
 
-(defn run-async [program & [interact dflt]]
+(defn run-async [program & [interact dflt tmo-ms]]
   (let [result (atom dflt)]
     (dt/rendering
      (c/local-state false
@@ -32,11 +32,14 @@
      (fn [env]
        (a/async
         (when interact (a/await (interact env)))
-        (a/await (dt/find env (dt/by-text (str ::done))))
+        (a/await (apply dt/find env (dt/by-text (str ::done))
+                        (when tmo-ms
+                          [:timeout tmo-ms])))
         @result)))))
 
 (deftest return-test
-  (is (= 42 (run-sync (p/return 42)))))
+  (is (= 42 (run-sync (p/return 42))))
+  (is (= nil (run-sync (p/return nil) :init))))
 
 (deftest bind-test-1
   (is (= "42"
@@ -136,7 +139,7 @@
        (run-sync (p/race (p/return :a)
                          (p/return :b)))))
   (is (= :b
-         (run-sync (p/race (p/block "Foo")
+         (run-sync (p/race (p/show "Foo")
                            (p/return :b))))))
 
 
@@ -182,8 +185,7 @@
         f (partial dom/div)]
     (is (= (p/wrap f p) (p/wrap f p))))
 
-  (let [p (p/return 42)]
-    (is (= (p/block p) (p/block p))))
+  (is (= (p/show 42) (p/show 42)))
 
   (is (= (p/await-action c/empty empty?) (p/await-action c/empty empty?)))
 
