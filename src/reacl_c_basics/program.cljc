@@ -53,12 +53,38 @@
   [item]
   (eager item item))
 
-(defn- handle-result [item f]
-  (-> item
-      (c/handle-action (fn [st a]
-                         (if (done? a)
-                           (f st (done-result a))
-                           (c/return :action a))))))
+(let [k (fn [f st a]
+          (if (done? a)
+            (f st (done-result a))
+            (c/return :action a)))]
+  (defn- handle-result [item f]
+    (-> item
+        (c/handle-action (f/partial k f)))))
+
+(r/define-record-type ^{:rtd-record? true :private true} Jump
+  (jump program) jump?
+  [program jump-program])
+
+(let [make-run (fn [[st [c run?]]]
+                 (if run?
+                   (c/return)
+                   (c/return :state [st [c true]])))
+      f (fn [[_ [current run?]]]
+          ;; Note: we always have to render the continuation in not-runing state first, because if
+          ;; the previous and next programs are 'identical', then local-states have to be cleared first.
+          (-> (c/fragment (c/focus lens/first (if run? (running current) (not-running current)))
+                          (when-not run? (c/once make-run)))
+              (c/handle-action
+               (fn [state a]
+                 (if (jump? a)
+                   (c/return :state [(first state) [(jump-program a) false]])
+                   (c/return :action a))))))]
+  (defn- run-on-trampoline [init]
+    (c/local-state [init true]
+                   (c/dynamic f))))
+
+(defn jump-once [program]
+  (c/init (c/return :action (jump program))))
 
 (letfn [(bind-p1-done [st result]
           (c/return :state [(first st) (done result)]))
@@ -67,22 +93,39 @@
             (-> (running program)
                 (handle-result bind-p1-done))
             (running (cont (done-result p1-result)))))]
-  (defn bind ;; TODO: rename 'then' ?
-    "A program that runs `program` first, and then the program `(cont
-  result)`, where `result` is the result of the first program."
+  (defn- simple-bind
     [program cont]
-    ;; TODO: add to docu that cont may be run multiple times?
-    ;; TODO: is it tail recursive? should be if possible.
     (eager
      (c/local-state nil
                     (c/dynamic bind-run program cont))
      (not-running program))))
 
-(c/defn-item run ;; TODO: rename as a noun - runner ? executor? once ?
+(letfn [(bind-k [cont _ result] (c/return :action (jump (cont result))))]
+  (defn- tailrec-bind
+    [program cont]
+    (eager
+     ;; the first program runs on it's own trampoine, the continuation
+     ;; is 'thrown' to the trampoline running this bind.
+     (-> (run-on-trampoline program)
+         (handle-result (f/partial bind-k cont)))
+     (not-running program))))
+
+(def ^:private use-trampoline? true) ;; makes binds resp. sequ tail-recursive.
+
+(defn bind ;; TODO: rename 'then' ?
+  "A program that runs `program` first, and then the program `(cont
+  result)`, where `result` is the result of the first program."
+  [program cont]
+  (assert (program? program) program)
+  (if use-trampoline?
+    (tailrec-bind program cont)
+    (simple-bind program cont)))
+
+(c/defn-item runner
   "An item that runs the given program once, offering an event handler
   for handling the result of the program."
   [program & [handle-result-f]]
-  (-> (running program)
+  (-> (if use-trampoline? (run-on-trampoline program) (running program))
       (handle-result (fn [state r]
                        (if (some? handle-result-f)
                          (handle-result-f state r)
@@ -188,7 +231,7 @@
                            item)
             item))
         (par-run-p [_ programs idx p]
-          (run (wrap (f/partial c/focus lens/first) p)
+          (runner (wrap (f/partial c/focus lens/first) p)
             (fn on-result [state result]
               (let [new-parts (assoc (second state) idx result)]
                 (cond-> (c/return :state [(first state) new-parts])
@@ -211,7 +254,7 @@
             (if (= idx winner-idx)
               (running p) ;; keep the winner in 'running' state, until the whole 'race' is rendered non-running.
               (not-running p))
-            (run (wrap (f/partial c/focus lens/first) p)
+            (runner (wrap (f/partial c/focus lens/first) p)
               (fn on-result [state result]
                 (if (some? (second state))
                   ;; two 'simoultanous' winners? can that happen? Maybe ignore second then...?
@@ -277,7 +320,7 @@
                        :else
                        (c/return :action a)))))
               (when run?
-                (run prog
+                (runner prog
                   (fn [st result]
                     (c/return :state (assoc st 1 false)
                               :action [::result result])))))))

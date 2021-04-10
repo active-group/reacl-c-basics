@@ -4,14 +4,16 @@
             [reacl-c.dom :as dom]
             [reacl-c.test-util.dom-testing :as dt]
             [active.clojure.lens :as lens]
+            [active.clojure.functions :as f]
             [cljs-async.core :as a :include-macros true]
             [cljs-async.test :as at :include-macros true]
+            [reacl-c.test-util.core :as ct]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
 
 (defn- run-sync [program & [dflt]]
   (let [result (atom dflt)]
     (dt/rendering
-     (p/run
+     (p/runner
        program
        (fn [st res]
          (reset! result res)
@@ -23,7 +25,7 @@
   (let [result (atom dflt)]
     (dt/rendering
      (c/local-state false
-                    (c/fragment (p/run
+                    (c/fragment (p/runner
                                   (p/wrap (partial c/focus lens/first) program)
                                   (fn [st res]
                                     (reset! result res)
@@ -100,19 +102,20 @@
 
 (deftest sequ-test-1
   (let [r1 (atom nil)
-        ord (atom nil)]
+        ord (atom [])]
     (is (= 21
            (run-sync
             (p/sequ (p/bind (p/return 42) (fn [r]
-                                            (reset! ord :p1)
+                                            (swap! ord conj :p1)
                                             (reset! r1 r)
                                             (p/return nil)))
                     (p/bind (p/return nil) (fn [r]
-                                             (reset! ord :p2)
+                                             (swap! ord conj :p2)
                                              (p/return 21)))))))
     ;; p1 did run, but p2 came after it
     (is (= 42 @r1))
-    (is (= :p2 @ord))))
+    ;; Note: continuation are allowed to called more than once, currently.
+    (is (= [:p1 :p2] (distinct @ord)))))
 
 (deftest sequ-test-2
   ;; can run the same program twice
@@ -190,3 +193,103 @@
   (is (= (p/await-action c/empty empty?) (p/await-action c/empty empty?)))
 
   (is (= (p/await-state c/empty :foo) (p/await-state c/empty :foo))))
+
+(let [eh (fn [ev]
+           (.preventDefault ev))]
+  (defn preventing-error-log-async [f]
+    (js/window.addEventListener "error" eh)
+    (a/finally (f)
+               (fn []
+                 (js/window.removeEventListener "error" eh)))))
+
+(let [eh (fn [ev]
+           #_(js/console.log "not logging:" ev)
+           (.preventDefault ev))
+      inst (c/effect (fn []
+                       (js/window.addEventListener "error" eh)))
+      uninst (c/effect (fn []
+                         (js/window.removeEventListener "error" eh)))]
+  (defn silenced-unhandled-errors [item]
+    item
+    ;; unfortunately, this breaks something in the tail-rec test... :-/
+    #_(c/local-state false
+                   (c/fragment
+                    (c/dynamic (fn [[_ t]]
+                                 (if t (c/focus lens/first item) c/empty)))
+                    (c/focus lens/second
+                             (c/once (f/constantly (c/return :action inst
+                                                             :state true))
+                                     (f/constantly (c/return :action uninst))))))))
+
+(defn throw-once []
+  (silenced-unhandled-errors
+   (c/local-state true
+                  (-> (c/dynamic (fn [[_ do?]]
+                                   (if do?
+                                     (throw (js/Error. "IGNORE: Intended test error"))
+                                     c/empty)))
+                      (c/handle-error (fn [[st _]]
+                                        [st false]))))))
+
+(let [orig (.-error js/console)]
+  (defn with-capturing-console-error [item f]
+    (c/fragment (c/once (fn [st]
+                          (set! (.-error js/console)
+                                (fn [& args]
+                                  (f args orig)))
+                          (c/return))
+                        (fn [st]
+                          (set! (.-error js/console) orig)
+                          (c/return)))
+                item)))
+
+(defn current-component-stack []
+  ;; an item that emits the current component stack as an action.
+  
+  ;; this is quite hacks, and might well fail in future React
+  ;; versions: We try to capture the console error that react prints,
+  ;; which lists the component hierarchy.
+  (c/with-async-actions
+    (fn [emit!]
+      (with-capturing-console-error
+        (throw-once)
+        (fn [args original]
+          (if (and (string? (first args))
+                   (.startsWith (first args) "The above error occurred in"))
+            (emit! (first args))
+            (apply original args)))))))
+
+(defn with-size-of-component-structure [f]
+  (let [top (atom nil)
+        max-size (atom 0)]
+    (p/wrap (fn [item]
+              (c/with-ref (fn [ref]
+                            (reset! top ref)
+                            (c/refer item ref))))
+            (f (fn [_]
+                 (p/fmap count
+                         (p/await-action (current-component-stack)
+                                         string?)))))))
+
+(at/deftest tail-recursiveness
+  (let [size-of (fn [N]
+                  (run-async (with-size-of-component-structure
+                               (fn [k]
+                                 (apply p/sequ (concat (repeat N (p/return 0))
+                                                       [(p/bind (p/return nil) k)]))))
+                             
+                             nil :init 1000))]
+    #_(preventing-error-log-async
+     (fn []
+       ))
+    (a/async
+     ;; to check the above technique seems to be working:
+     (is (not= 0 (a/await (size-of 1))))
+     (is (= (a/await (size-of 2)) (a/await (size-of 2))))
+     
+     (is (not (< (a/await (size-of 2))
+                 (a/await (size-of 4))
+                 (a/await (size-of 8))
+                 (a/await (size-of 16))))))
+    ))
+
