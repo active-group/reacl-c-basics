@@ -1,4 +1,4 @@
-(ns reacl-c-basics.program
+(ns reacl-c-basics.programs.core
   "Programs are an abstraction over items, that have a dedicated result, and form an async monad."
   (:require #?(:cljs [reacl-c.core :as c :include-macros true])
             #?(:clj [reacl-c.core :as c])

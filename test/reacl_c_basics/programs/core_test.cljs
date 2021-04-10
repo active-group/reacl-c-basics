@@ -1,5 +1,5 @@
-(ns reacl-c-basics.program-test
-  (:require [reacl-c-basics.program :as p :include-macros true]
+(ns reacl-c-basics.programs.core-test
+  (:require [reacl-c-basics.programs.core :as p :include-macros true]
             [reacl-c.core :as c]
             [reacl-c.dom :as dom]
             [reacl-c.test-util.dom-testing :as dt]
