@@ -28,7 +28,9 @@
 #?(:clj
    (defmacro defstyles "Defines a function returning string with one or more class names for
   the given css style. Same as [[cljss.core/defstyles]]." [name args styles]
-     `(css/defstyles name args styles)))
+     `(css/defstyles ~name ~args ~styles)))
+
+;; defn-dom + style?
 
 #?(:clj (defmacro ^:no-doc css-1 [styles]
           (let [cls (str "css-" (hash styles))]
