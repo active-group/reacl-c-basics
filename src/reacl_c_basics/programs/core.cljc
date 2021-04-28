@@ -2,7 +2,6 @@
   "Programs are an abstraction over items, that have a dedicated result, and form an async monad."
   (:require #?(:cljs [reacl-c.core :as c :include-macros true])
             #?(:clj [reacl-c.core :as c])
-            #?(:cljs [reacl-c.dom :as dom :include-macros true])
             #?(:cljs [active.clojure.cljs.record :as r :include-macros true])
             #?(:clj [active.clojure.record :as r])
             #?(:cljs [reacl-c-basics.core :as core])
@@ -283,6 +282,7 @@
   "
   [form & forms]
   (cond
+    ;; TODO: local let bindings.
     (empty? forms)
     (cond
       (vector? form) (second form)
@@ -293,44 +293,9 @@
       (vector? form) `(then ~(second form) (fn [~(first form)] (do-program ~@forms)))
       :else `(sequ ~form (do-program ~@forms)))))
 
-#?(:cljs
-   ;; TODO: dom/defn-dom (optional attrs)
-   (c/defn-item run-button
-     "A dom button that runs a program each time it is clicked, but is
-     disabled while it is running. The program will be rendered after
-     the button in a fragment."
-     [attrs & content]
-     (-> (c/with-state-as [_ run? :local false]
-           (assert (not (contains? attrs :onclick)))
-           (let [prog (:program attrs)
-                 onresult (:onresult attrs)]
-             (c/fragment
-              (-> (c/focus lens/first
-                           (apply dom/button (-> attrs
-                                                 (dissoc :program :onresult)
-                                                 (assoc :onclick (fn [st _]
-                                                                   (c/return :action ::start)))
-                                                 (assoc :disabled (or (:disabled attrs) run?)))
-                                  content))
-                  (c/handle-action
-                   (fn [st a]
-                     (cond
-                       (= ::start a)
-                       (assoc st 1 true)
-                       :else
-                       (c/return :action a)))))
-              (when run?
-                (runner prog
-                  (fn [st result]
-                    (c/return :state (assoc st 1 false)
-                              :action [::result result])))))))
-         (c/handle-action
-          (fn [st a]
-            (cond
-              (and (vector? a) (= ::result (first a)))
-              (if-let [f (:onresult attrs)]
-                (f st (second a))
-                (c/return))
-              :else
-              (c/return :action a)))))))
-
+(defmacro defn-program
+  "A macro just like `defn`, but where the body is wrapped in [[do-program]]."
+  [name params & body]
+  ;; TODO: docstring, schema annotations, preconditions
+  `(defn ~name ~params
+     (do-program ~@body)))

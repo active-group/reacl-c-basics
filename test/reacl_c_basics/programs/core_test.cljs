@@ -146,22 +146,6 @@
                            (p/return :b))))))
 
 
-(deftest run-button-test
-  (let [run? (atom false)]
-    (dt/rendering
-     (p/run-button
-      {:program (p/then (p/return "42")
-                        (fn [v]
-                          (reset! run? true)
-                          (p/return nil)))}
-      "click me")
-     (fn [env]
-       (let [btn (dt/get env (dt/by-text "click me"))]
-         (is (some? btn))
-         (dt/fire-event btn :click))
-
-       (is @run?)))))
-
 (deftest referntial-equality-test
   (is (= (p/return 42) (p/return 42)))
   
