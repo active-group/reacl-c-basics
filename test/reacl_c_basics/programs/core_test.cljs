@@ -7,8 +7,36 @@
             [active.clojure.functions :as f]
             [cljs-async.core :as a :include-macros true]
             [cljs-async.test :as at :include-macros true]
-            [reacl-c.test-util.core :as ct]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
+
+(at/deftest runner-test
+  (a/async
+   (a/await
+    (testing "should run programs only once"
+      (let [result (atom [])
+            clicks (atom 0)]
+        (dt/rendering
+         (c/isolate-state 0
+                          (c/fragment
+                           (dom/button {:onClick (fn [c]
+                                                   (swap! clicks inc)
+                                                   (inc c))}
+                                       "click")
+                           (p/runner
+                            ;; TODO: need to test it for all primitives
+                            #_(p/return 42)
+                            #_(p/then (p/return 21) (fn [x] (p/return (* 2 x))))
+                            (p/race (p/show "42") (p/then (p/return 21) (fn [x] (p/return (* 2 x)))))
+                            (fn [st res]
+                              (swap! result conj res)
+                              st))))
+       
+         (fn [env]
+           (a/async
+            (dt/fire-event (dt/get env (dt/by-text "click")) :click)
+            (dt/fire-event (dt/get env (dt/by-text "click")) :click)
+            (is (= @clicks 2))
+            (is (= [42] @result))))))))))
 
 (defn- run-sync [program & [dflt]]
   (let [result (atom dflt)]

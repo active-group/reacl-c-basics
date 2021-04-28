@@ -68,16 +68,16 @@
                  (if run?
                    (c/return)
                    (c/return :state [st [c true]])))
+      ha (fn [state a]
+           (if (jump? a)
+             (c/return :state [(first state) [(jump-program a) false]])
+             (c/return :action a)))
       f (fn [[_ [current run?]]]
           ;; Note: we always have to render the continuation in not-runing state first, because if
           ;; the previous and next programs are 'identical', then local-states have to be cleared first.
           (-> (c/fragment (c/focus lens/first (if run? (running current) (not-running current)))
                           (when-not run? (c/once make-run)))
-              (c/handle-action
-               (fn [state a]
-                 (if (jump? a)
-                   (c/return :state [(first state) [(jump-program a) false]])
-                   (c/return :action a))))))]
+              (c/handle-action ha)))]
   (defn- run-on-trampoline [init]
     (c/local-state [init true]
                    (c/dynamic f))))
@@ -111,7 +111,7 @@
 
 (def ^:private use-trampoline? true) ;; makes thens resp. sequ tail-recursive.
 
-(defn then ;; TODO: rename 'then' ?
+(defn then
   "A program that runs `program` first, and then the program `(cont
   result)`, where `result` is the result of the first program."
   [program cont]
@@ -120,20 +120,42 @@
     (tailrec-then program cont)
     (simple-then program cont)))
 
-(c/defn-item runner
-  "An item that runs the given program once, offering an event handler
+(let [h (fn [handle-result-f state r]
+          (if (some? handle-result-f)
+            (handle-result-f state r)
+            (c/return)))]
+  (c/defn-item runner
+    "An item that runs the given program once, offering an event handler
   for handling the result of the program."
-  [program & [handle-result-f]]
-  (-> (if use-trampoline? (run-on-trampoline program) (running program))
-      (handle-result (fn [state r]
-                       (if (some? handle-result-f)
-                         (handle-result-f state r)
-                         (c/return))))))
+    [program & [handle-result-f]]
+    (assert (program? program) program)
+    (c/with-state-as [_ run? :local false]
+      (c/fragment (c/focus lens/first
+                           (if-not run?
+                             (not-running program)
+                             (-> (if use-trampoline? (run-on-trampoline program) (running program))
+                                 (handle-result (f/partial h handle-result-f)))))
+                  (c/focus lens/second (c/init (c/return :state true)))))))
 
 ;; TODO ?
-#_(c/defn-item mutator [f]
-  ;; run program (f state), setting state on done, then restart immediately
-  )
+#_(c/defn-item mutator
+  "An item that calls f with its the current state, which must return
+  a program. When program returns its result becomes the items new
+  state, and the process starts over again immediately."
+  [f]
+  ;; TODO: static fns
+  (c/with-state-as [state loop :local 0]
+    (-> (c/focus lens/first
+                 (-> (runner (f state)
+                             (fn [[_ loop] result]
+                               (c/return :action ::restart
+                                         :state result)))
+                     ;; key forces a new runner for each loop
+                     (c/keyed (str loop))))
+        (c/handle-action (fn [[st loop] a]
+                           (if (= a ::restart)
+                             (c/return :state [st (inc loop)])
+                             (c/return :action a)))))))
 
 (defn wrap*
   "A program wrapped in some additional markup, via `(f item running?)`,
@@ -157,19 +179,22 @@
   [f program]
   (then program (f/comp return f)))
 
-(let [check-state (fn [done-state? st]
-                    (if (done-state? st)
-                      (c/return :action (done st))
+(let [check-state (fn [done-state? prev new]
+                    (if (and (not (done-state? prev))
+                             (done-state? new))
+                      ;; we must not emit multiple done actions.
+                      (c/return :action (done new))
                       (c/return)))
       check-state-change (fn [done-state? prev new]
-                           (c/merge-returned (check-state done-state? new)
+                           (c/merge-returned (check-state done-state? prev new)
                                              (c/return :state new)))]
   (defn await-state
     "A program that shows the given item to start it, until its state is a
   non-nil value, or the given predicate holds, returning that value as
-  the program's result. Does not show the item when the program is not
-  running."
-    [item & [done-state?]]
+  the program's result. Shows `not-running` when the program is not
+  running, which defaults to [[reacl-c.core/empty]]."
+    [item & [done-state? not-running]]
+    ;; TODO: help with an item that should not be running on the whole program state? isolate-state, local-state not easy... await-local-state ?
     (eager
      (let [done-state? (or done-state? some?)]
        (-> (c/fragment
@@ -179,8 +204,10 @@
              (f/partial check-state done-state?)))
            (c/handle-state-change
             (f/partial check-state-change done-state?))))
-     c/empty)))
+     (or not-running c/empty))))
 
+(defn await-state* [f & [done-state?]]
+  (await-state (f true) done-state? (f false)))
 
 (let [f (fn [pred a]
           (if (pred a)
@@ -189,13 +216,16 @@
   (defn await-action
     "A program that shows the given item to start it, until it emits an
   action where the given predicate holds, which is then returned as
-  the programs result. Does not show the item when the program is not
-  running."
-    [item pred]
+  the programs result. Shows `not-running` when the program is not
+  running, which defaults to [[reacl-c.core/empty]]."
+    [item pred & [not-running]]
     (eager
      (-> item
          (c/map-actions (f/partial f pred)))
-     c/empty)))
+     (or not-running c/empty))))
+
+(defn await-action* [f pred]
+  (await-action (f true) pred (f false)))
 
 (let [k (fn [sequ-f programs _]
           (apply sequ-f programs))]
@@ -229,13 +259,14 @@
             (c/local-state {}
                            item)
             item))
+        (par-on-result [programs idx state result]
+          (let [new-parts (assoc (second state) idx result)]
+            (cond-> (c/return :state [(first state) new-parts])
+              (= (count new-parts) (count programs))
+              (c/merge-returned (c/return :action (done (mapv new-parts (range (count programs)))))))))
         (par-run-p [_ programs idx p]
           (runner (wrap (f/partial c/focus lens/first) p)
-            (fn on-result [state result]
-              (let [new-parts (assoc (second state) idx result)]
-                (cond-> (c/return :state [(first state) new-parts])
-                  (= (count new-parts) (count programs))
-                  (c/merge-returned (c/return :action (done (mapv new-parts (range (count programs)))))))))))]
+                  (f/partial par-on-result programs idx)))]
   (defn par [& programs]
     "A program running several programs in parallel, returning a sequence
   of all their results after all are finished. The visual items of the
@@ -248,20 +279,22 @@
             (c/local-state nil ;; -> [idx result] when first is done
                            item)
             item))
+        (race-on-result [idx state result]
+          (if (some? (second state))
+            ;; two 'simoultanous' winners? can that happen? Maybe ignore second then...?
+            (do (assert false (str "Race had more than one winner? Previously: " (pr-str (second state)) ", now: " (pr-str [idx result])))
+                (c/return))
+            (let [winner [idx result]]
+              (c/return :state [(first state) winner]
+                        :action (done result)))))
         (race-run-p [state _ idx p]
           (if-let [[winner-idx _] (second state)]
-            (if (= idx winner-idx)
+            #_(if (= idx winner-idx)  ... made runner-test fail; maybe because it's rendered at a different location again?
               (running p) ;; keep the winner in 'running' state, until the whole 'race' is rendered non-running.
               (not-running p))
+            (not-running p)
             (runner (wrap (f/partial c/focus lens/first) p)
-              (fn on-result [state result]
-                (if (some? (second state))
-                  ;; two 'simoultanous' winners? can that happen? Maybe ignore second then...?
-                  (do (assert false (str "Race had more than one winner? Previously: " (pr-str (second state)) ", now: " (pr-str [idx result])))
-                      (c/return))
-                  (let [winner [idx result]]
-                    (c/return :state [(first state) winner]
-                              :action (done result))))))))]
+                    (f/partial race-on-result idx))))]
   (defn race
     "A program running several programms in parallel, until the first one
   is finished, returning the result of that 'winner'."
