@@ -2,7 +2,7 @@
   (:require [reacl-c.dom :as dom]
             [reacl-c.core :as c :include-macros true]))
 
-;; TODO: add merge-attributes?
+;; TODO: remove defn-dom
 
 (defn ^:no-doc split-dom-attrs [args]
   (if (and (not-empty args)
