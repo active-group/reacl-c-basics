@@ -242,24 +242,32 @@
                       (c/handle-error (fn [[st _]]
                                         [st false]))))))
 
-(let [orig (.-error js/console)]
-  (defn with-capturing-console-error [item f]
-    (c/fragment (c/once (fn [st]
-                          (set! (.-error js/console)
-                                (fn [& args]
-                                  (f args orig)))
-                          (c/return))
-                        (fn [st]
-                          (set! (.-error js/console) orig)
-                          (c/return)))
-                item)))
+(c/defn-effect set-console-error! [f]
+  (set! (.-error js/console) f))
+
+(defn with-capturing-console-error [item f]
+  (c/local-state nil
+                 (c/fragment
+                  (c/once (fn [[s st]]
+                            (let [orig (.-error js/console)
+                                  h (fn [& args] ;; must be a real fn.
+                                      (f args orig))]
+                              (if (nil? st)
+                                (c/return :state [s orig]
+                                          :action (set-console-error! h))
+                                (c/return))))
+                          (fn [[_ orig]]
+                            (c/return :action (set-console-error! orig))))
+                  (c/dynamic (fn [[_ st]]
+                               (when (some? st)
+                                 (c/focus lens/second item)))))))
 
 (defn current-component-stack []
   ;; an item that emits the current component stack as an action.
   
-  ;; this is quite hacks, and might well fail in future React
-  ;; versions: We try to capture the console error that react prints,
-  ;; which lists the component hierarchy.
+  ;; this is quite hacky, and might well fail in future React
+  ;; versions: We try to capture the console error that react prints
+  ;; when an exception is thrown, which lists the component hierarchy.
   (c/with-async-actions
     (fn [emit!]
       (with-capturing-console-error
