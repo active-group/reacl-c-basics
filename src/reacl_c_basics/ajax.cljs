@@ -91,6 +91,7 @@
   or success, then `(f state response)` is evaluated, which must
   return a [[reacl-c.core/return]] value."
   [req f]
+  (assert (request? req) req)
   (-> (execute req)
       (c/handle-action f)))
 
