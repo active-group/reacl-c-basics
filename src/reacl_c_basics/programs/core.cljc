@@ -103,7 +103,7 @@
   (defn- tailrec-then
     [program cont]
     (eager
-     ;; the first program runs on its own trampoine, the continuation
+     ;; the first program runs on its own trampoline, the continuation
      ;; is 'thrown' to the trampoline running this.
      (-> (run-on-trampoline program)
          (handle-result (f/partial then-k cont)))
@@ -288,13 +288,14 @@
               (c/return :state [(first state) winner]
                         :action (done result)))))
         (race-run-p [state _ idx p]
-          (if-let [[winner-idx _] (second state)]
-            #_(if (= idx winner-idx)  ... made runner-test fail; maybe because it's rendered at a different location again?
-              (running p) ;; keep the winner in 'running' state, until the whole 'race' is rendered non-running.
-              (not-running p))
-            (not-running p)
-            (runner (wrap (f/partial c/focus lens/first) p)
-                    (f/partial race-on-result idx))))]
+          ;; keeps the winner in 'running' state, (until the whole 'race' is rendered non-running)
+          (let [p_ (wrap (f/partial c/focus lens/first) p)]
+            (if (let [[winner-idx _] (second state)]
+                  (or (nil? winner-idx)
+                      (= winner-idx idx)))
+              (handle-result (running p_)
+                             (f/partial race-on-result idx))
+              (not-running p_))))]
   (defn race
     "A program running several programms in parallel, until the first one
   is finished, returning the result of that 'winner'."
