@@ -293,8 +293,7 @@
             (if (let [[winner-idx _] (second state)]
                   (or (nil? winner-idx)
                       (= winner-idx idx)))
-              (handle-result (running p_)
-                             (f/partial race-on-result idx))
+              (runner p_ (f/partial race-on-result idx))
               (not-running p_))))]
   (defn race
     "A program running several programms in parallel, until the first one
