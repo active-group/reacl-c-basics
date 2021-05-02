@@ -36,7 +36,36 @@
             (dt/fire-event (dt/get env (dt/by-text "click")) :click)
             (dt/fire-event (dt/get env (dt/by-text "click")) :click)
             (is (= @clicks 2))
-            (is (= [42] @result))))))))))
+            (is (= [42] @result))))))))
+
+   (a/await
+    (testing "does not change state when unmounted"
+      (let [changes (atom [])]
+        (dt/rendering
+         (c/isolate-state 0
+                          (c/dynamic
+                           (fn [res]
+                             (-> (if (zero? res)
+                                   (p/runner
+                                    #_(p/return 42)
+                                    #_(p/race (p/show "42") (p/then (p/return 21) (fn [x] (p/return (* 2 x)))))
+                                    #_(p/await-state (c/init 42))
+                                    (p/race (p/show "42") (p/await-state (c/init 42)))
+                                    (fn [st res]
+                                      (assert (= res 42))
+                                      res))
+                                   "done")
+                                  
+                                 (c/monitor-state
+                                  (fn [prev next]
+                                    (swap! changes conj next)))))))
+       
+         (fn [env]
+           (a/async
+            (a/await (dt/find env (dt/by-text "done")))
+            (a/await (a/timeout 100))
+            (is (= [42] @changes))
+            ))))))))
 
 (defn- run-sync [program & [dflt]]
   (let [result (atom dflt)]
