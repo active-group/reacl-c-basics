@@ -281,8 +281,8 @@
             item))
         (race-on-result [idx state result]
           (if (some? (second state))
-            ;; two 'simoultanous' winners? can that happen? Maybe ignore second then...?
-            (do (assert false (str "Race had more than one winner? Previously: " (pr-str (second state)) ", now: " (pr-str [idx result])))
+            ;; two 'simoultanous' winners? can happen if both are just returns for example. Ignore second then...
+            (do #_(assert false (str "Race had more than one winner? Previously: " (pr-str (second state)) ", now: " (pr-str [idx result])))
                 (c/return))
             (let [winner [idx result]]
               (c/return :state [(first state) winner]
@@ -300,7 +300,7 @@
   is finished, returning the result of that 'winner'."
     [program & programs]
     (wrap* race-wrap
-           (par-base programs race-run-p))))
+           (par-base (cons program programs) race-run-p))))
 
 (defmacro do-program
   "A monadic do notation for programs.

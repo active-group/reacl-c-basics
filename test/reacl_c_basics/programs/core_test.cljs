@@ -200,7 +200,10 @@
                          (p/return :b)))))
   (is (= :b
          (run-sync (p/race (p/show "Foo")
-                           (p/return :b))))))
+                           (p/return :b)))))
+  (is (= :a
+         (run-sync (p/race (p/return :a)
+                           (p/show "Foo"))))))
 
 
 (deftest referntial-equality-test
