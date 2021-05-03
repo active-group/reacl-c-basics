@@ -7,36 +7,32 @@
 (defn- checked-state [_ e]
   (.. e -target -checked))
 
-(c/defn-item checkbox [& args]
+(dom/defn-dom checkbox [attrs & children]
   (c/with-state-as checked
-    (let [[attrs children] (core/split-dom-attrs args)]
-      (apply dom/input (merge {:type "checkbox"
-                               :checked checked
-                               :onchange checked-state}
-                              attrs)
-             children))))
-
-(c/defn-item radio [& args]
-  (let [[attrs children] (core/split-dom-attrs args)]
-    (apply checkbox (merge {:type "radio"}
-                           attrs)
+    (apply dom/input (dom/merge-attributes {:type "checkbox"
+                                            :checked checked
+                                            :onchange checked-state}
+                                           attrs)
            children)))
+
+(dom/defn-dom radio [attrs & children]
+  (apply checkbox (dom/merge-attributes {:type "radio"}
+                                        attrs)
+         children))
 
 (defn- value-state [_ e]
   (c/return :state (.. e -target -value)))
 
-(c/defn-item ^:private input-value [f fixed-attrs args]
+(c/defn-item ^:private input-value [f fixed-attrs attrs children]
   (c/with-state-as value
-    ;; Note: args must not be var-args, to workaround various (!) clojurescript bugs with >= 21 args and IFns.
-    (let [[attrs children] (core/split-dom-attrs args)]
-      (apply f (merge fixed-attrs
-                      {:value value
-                       :onchange value-state}
-                      attrs)
-             children))))
+    (apply f (dom/merge-attributes fixed-attrs
+                                   {:value value
+                                    :onchange value-state}
+                                   attrs)
+           children)))
 
-(defn input-string [& args]
-  (input-value dom/input {:type "text"} args))
+(dom/defn-dom input-string [attrs & children]
+  (input-value dom/input {:type "text"} attrs children))
 
 (defn- input-parsed-lens*
   ([parse restrict [value text]]
@@ -110,12 +106,11 @@
 (defn- unrestricted [old new]
   new)
 
-(c/defn-item input-number [& args]
-  (let [[attrs content] (core/split-dom-attrs args)]
-    (apply input-parsed parse-number unparse-number unrestricted
-           (merge {:type "number"}
-                  attrs)
-           content)))
+(dom/defn-dom input-number [attrs & content]
+  (apply input-parsed parse-number unparse-number unrestricted
+         (dom/merge-attributes {:type "number"}
+                               attrs)
+         content))
 
 (def ^:private integer-regex #"^[-]?\d*$")
 
@@ -137,27 +132,26 @@
 (defn ^:no-doc restrict-int [old new]
   (apply str (filter #(.test #"[0-9-]" %) new)))
 
-(c/defn-item input-int [& args]
-  (let [[attrs content] (core/split-dom-attrs args)]
-    (apply input-parsed parse-int unparse-int
-           ;; Note with type 'number' we don't even see a lot of the 'invalid' inputs; so restrict-int makes only sense for :text
-           ;; But that should not be used - on smart phones, the number pad usually only shows up for :type "number".
-           (if (= "text" (:type attrs))
-             restrict-int
-             unrestricted)
-           (merge {:pattern #(or % (str integer-regex))}
-                  attrs)
-           content)))
+(dom/defn-dom input-int [attrs & content]
+  (apply input-parsed parse-int unparse-int
+         ;; Note with type 'number' we don't even see a lot of the 'invalid' inputs; so restrict-int makes only sense for :text
+         ;; But that should not be used - on smart phones, the number pad usually only shows up for :type "number".
+         (if (= "text" (:type attrs))
+           restrict-int
+           unrestricted)
+         (dom/merge-attributes {:pattern #(or % (str integer-regex))}
+                               attrs)
+         content))
 
-(defn textarea [& args]
-  (input-value dom/textarea {} args))
+(dom/defn-dom textarea [attrs & children]
+  (input-value dom/textarea {} attrs children))
 
 (c/defn-item ^:private select-opt-list :static [options]
   (apply c/fragment options))
 
 (defn- select-string* [attrs options]
   (input-value dom/select {}
-               [attrs (select-opt-list options)]))
+               attrs [(select-opt-list options)]))
 
 ;; select and options, extended to work with arbitrary clojure values.
 (defn- option-value-lens
@@ -197,22 +191,24 @@
               :else nil))
           options))
 
-;; Note: we get into an (IFn?) arity problem when using c/defn-item here :-/
 (defn select-string
   "Like [[dom/select]], but the selected (string) value is the state
   of the returned item."
-  [& args]
-  (let [[attrs options] (core/split-dom-attrs args)]
+  [attrs & options]
+  (let [[attrs options] (if-not (dom/dom-attributes? attrs)
+                          [{} (cons attrs options)]
+                          [attrs options])]
     (select-string* attrs (map-option-tags options identity))))
 
-;; Note: we get into an (IFn?) arity problem when using c/defn-item here :-/
 (defn select
   "Like dom/select, but with the selected value as the state of the
   returned item, and if [[option]] and [[optgroup]] are used, then
   this works with (almost) arbitrary clojure values as selectalbe
   values. See [[select-string]] if the values are only strings."
-  [& args]
-  (let [[attrs options] (core/split-dom-attrs args)
+  [attrs & options]
+  (let [[attrs options] (if-not (dom/dom-attributes? attrs)
+                          [{} (cons attrs options)]
+                          [attrs options])
         values (get-option-values options)
         options_ (map-option-tags options pr-str)]
     (c/focus (f/partial option-value-lens (set values))
@@ -221,21 +217,24 @@
 (defn option
   "Like dom/option, but can only be used for [[select]] or [[select-string]]."
   [attrs & args]
-  (assert (and (map? attrs) (contains? attrs :value)))
+  ;; an option without a value does not really make sense.
+  (assert (dom/dom-attributes? attrs))
+  (assert (contains? attrs :value))
   (Option. attrs args))
 
 (defn optgroup
   "Like dom/optgroup, but can only be used for [[select]] or [[select-string]]."
-  [& args]
-  (let [[attrs args] (core/split-dom-attrs args)]
+  [attrs & args]
+  (if-not (dom/dom-attributes? attrs)
+    (OptGroup. {} (cons attrs args))
     (OptGroup. attrs args)))
 
-(core/defn-dom submit-button [attrs & content]
-  (apply dom/button (merge {:type "submit"} attrs)
+(dom/defn-dom submit-button [attrs & content]
+  (apply dom/button (dom/merge-attributes {:type "submit"} attrs)
          content))
 
-(core/defn-dom reset-button [attrs & content]
-  (apply dom/button (merge {:type "reset"} attrs)
+(dom/defn-dom reset-button [attrs & content]
+  (apply dom/button (dom/merge-attributes {:type "reset"} attrs)
          content))
 
 (defn- submitter [f value ev]
@@ -253,11 +252,10 @@
            (:onsubmit attrs) (assoc :onsubmit (f/partial submitter (:onsubmit attrs))))
          content))
 
-(c/defn-item local-form [& args]
+(dom/defn-dom local-form [attrs & content]
   ;; :default should be the default state value.
   ;; :onsubmit should be a fn of submitted value => return
   ;; :onreset is added and resets to the default value.
-  (let [[attrs content] (core/split-dom-attrs args)]
-    (c/isolate-state (:default attrs)
-                     (apply form attrs
-                            content))))
+  (c/isolate-state (:default attrs)
+                   (apply form attrs
+                          content)))

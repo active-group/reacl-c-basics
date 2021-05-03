@@ -73,3 +73,9 @@
                            #js {:type "blur"})
       (is (= "" (current-text))))
     ))
+
+(deftest select-string-test
+  (testing "can take many args"
+    (tu/mount! (tu/env (apply forms/select-string {} (repeat 50 (forms/option {:value 42} "42")))) 42)
+    (is true) ;; ok if it does not fail
+    ))
