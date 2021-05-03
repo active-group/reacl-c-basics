@@ -13,29 +13,27 @@
   (a/async
    (a/await
     (testing "should run programs only once"
-      (let [result (atom [])
-            clicks (atom 0)]
+      (let [result (atom [])]
         (dt/rendering
          (c/isolate-state 0
                           (c/fragment
                            (dom/button {:onClick (fn [c]
-                                                   (swap! clicks inc)
                                                    (inc c))}
                                        "click")
                            (p/runner
-                            ;; TODO: need to test it for all primitives
+                            ;; TODO: need to test it for all primitives?
                             #_(p/return 42)
                             #_(p/then (p/return 21) (fn [x] (p/return (* 2 x))))
-                            (p/race (p/show "42") (p/then (p/return 21) (fn [x] (p/return (* 2 x)))))
+                            (p/race (p/show "xxx") (p/then (p/return 21) (fn [x] (p/return (* 2 x)))))
                             (fn [st res]
                               (swap! result conj res)
                               st))))
        
          (fn [env]
            (a/async
+            (is (= [42] @result))
+            ;; the click does not run it again
             (dt/fire-event (dt/get env (dt/by-text "click")) :click)
-            (dt/fire-event (dt/get env (dt/by-text "click")) :click)
-            (is (= @clicks 2))
             (is (= [42] @result))))))))
 
    (a/await
@@ -47,10 +45,13 @@
                            (fn [res]
                              (-> (if (zero? res)
                                    (p/runner
+                                    ;; TODO: need to test it for all primitives?
                                     #_(p/return 42)
                                     #_(p/race (p/show "42") (p/then (p/return 21) (fn [x] (p/return (* 2 x)))))
                                     #_(p/await-state (c/init 42))
                                     (p/race (p/show "42") (p/await-state (c/init 42)))
+                                    #_(p/await-action (c/init (c/return :action 42))
+                                                      int?)
                                     (fn [st res]
                                       (assert (= res 42))
                                       res))
