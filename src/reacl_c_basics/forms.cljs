@@ -1,6 +1,6 @@
 (ns reacl-c-basics.forms
   (:require [reacl-c.core :as c :include-macros true]
-            [reacl-c.dom :as dom]
+            [reacl-c.dom :as dom :include-macros true]
             [active.clojure.functions :as f]
             [reacl-c-basics.core :as core :include-macros true]))
 
