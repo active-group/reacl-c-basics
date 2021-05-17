@@ -17,7 +17,7 @@
   routes to pages, depending on the current browser location, which is
   monitored for changes. It also handles [[goto]] actions emitted from
   within, modifying the browser history accordingly. A page must be a
-  function taking the arguments the route, returning an item."
+  function taking the arguments of the route, returning an item."
   [pages]
   (history-router (history/html5-history) pages))
 
