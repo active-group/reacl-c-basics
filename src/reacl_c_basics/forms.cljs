@@ -139,7 +139,7 @@
          (if (= "text" (:type attrs))
            restrict-int
            unrestricted)
-         (dom/merge-attributes {:pattern #(or % (str integer-regex))}
+         (dom/merge-attributes {:pattern (str integer-regex)}
                                attrs)
          content))
 
