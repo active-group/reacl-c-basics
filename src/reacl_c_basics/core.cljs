@@ -24,19 +24,19 @@
       (js/window.cancelAnimationFrame id))))
 
 (c/defn-subscription timeout
-  "Subscription to a timer, emitting `true` as an action once, after they given number of milliseconds."
-  deliver! [ms]
+  "Subscription to a timer, emitting `true` or `action` as an action once, after they given number of milliseconds."
+  deliver! [ms & [action]]
   (let [id (js/window.setTimeout (fn []
-                                   (deliver! true))
+                                   (deliver! (when (some? action) action true)))
                                  ms)]
     (fn []
       (js/window.clearTimeout id))))
 
 (c/defn-subscription interval
-  "Subscription to a timer, emitting `true` as an action every given milliseconds."
-  deliver! [ms]
+  "Subscription to a timer, emitting `true` or `action` as an action every given milliseconds."
+  deliver! [ms & [action]]
   (let [id (js/window.setInterval (fn []
-                                    (deliver! true))
+                                    (deliver! (when (some? action) action true)))
                                   ms)]
     (fn []
       (js/window.clearInterval id))))
