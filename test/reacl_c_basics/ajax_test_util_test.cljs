@@ -2,36 +2,20 @@
   (:require [reacl-c-basics.ajax-test-util :as ajax-tu]
             [reacl-c-basics.ajax :as ajax]
             [reacl-c.core :as c :include-macros true]
-            [reacl-c.test-util.test-renderer :as tu]
-            [reacl-c.test-util.core :as tuc]
+            [reacl-c.test-util.dom-testing :as dt]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
 
-(deftest request-subscribe-effect-test
-  (let [req (ajax/GET "http://invalid.invalid/url")
-        sub-eff (let [r (atom nil)]
-                  (tu/mount! (tu/env (-> (ajax/execute req)
-                                         (tuc/emulate-subscriptions (fn [sub-eff]
-                                                                      (reset! r sub-eff)
-                                                                      c/no-effect))))
-                             nil)
-                  @r)]
-    (is (is (tuc/subscribe-effect? sub-eff (ajax/execute req))))
-    (is (ajax-tu/request-subscribe-effect? sub-eff))
-    (is (ajax-tu/request-subscribe-effect? sub-eff req))
-    (is (= req (ajax-tu/request-subscribe-effect-request sub-eff)))))
-
-(deftest emulator-test
+(deftest emulate-requests-test
   (let [req1 (ajax/GET "http://invalid.invalid/url")
         ok-res (ajax/ok-response :result)
-        env (tu/env (-> (c/dynamic #(if % (ajax/execute req1) c/empty))
-                        (ajax-tu/emulate-requests {req1 ok-res})))]
 
-    (is (= (c/return :action ok-res)
-           (tu/mount! env true)))
+        it (-> (c/fragment (ajax/fetch req1)
+                           (c/with-state-as st
+                             (cond (nil? st) "Pending"
+                                   (ajax/response-ok? st) (str "Ok " (ajax/response-value st))
+                                   :else "Error")))
+               (ajax-tu/emulate-requests {req1 ok-res}))]
 
-    (is (= (c/return)
-           (tu/update!! env false)))
-
-    (tu/mount! env true)
-    (is (= (c/return)
-           (tu/unmount! env)))))
+    (dt/rendering it
+                  (fn [env]
+                    (is (dt/get env (dt/by-text "Ok :result")))))))

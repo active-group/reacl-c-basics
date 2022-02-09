@@ -4,25 +4,29 @@
             [active.clojure.functions :as f]
             [reacl-c.test-util.core :as tu]))
 
-(defn request-subscribe-effect?
-  "Returns if the given effect action performs the subscription to the result of the given request."
-  [eff & [request]]
-  ;; Note: unsure why this does not work: (tu/subscribe-effect? eff (ajax/execute request))
-  (and (tu/subscribe-effect? eff)
-       (or (nil? request)
-           (tu/subscribe-effect? eff (ajax/execute request)))))
+(defn- request [sub]
+  (and (tu/subscription? sub ajax/execute)
+       (first (tu/subscription-args sub))))
 
-(defn request-subscribe-effect-request [eff]
-  {:pre [(request-subscribe-effect? eff)]}
-  (first (tu/subscribe-effect-args eff)))
+(let [f (fn [deliver! resp] (deliver! resp) (constantly nil))]
+  (defn- const-sub [resp]
+    (c/subscription f resp)))
 
-(let [h (fn [f sub-effect]
-          (if-let [resp (and (request-subscribe-effect? sub-effect)
-                             (f (request-subscribe-effect-request sub-effect)))]
-            resp ;; the response is the action
-            nil  ;; keep effect as is
-            ))]
-  (defn emulate-requests [item f]
-    ;; f may return c/no-effect to turn request 'off'.
-    (tu/emulate-subscriptions item
-                              (f/partial h f))))
+(let [h (fn [f sub]
+          (if-let [resp (when-let [req (request sub)]
+                          (f req))]
+            (do (assert (ajax/response? resp))
+                (const-sub resp))
+            nil))]
+  (defn emulate-requests
+    "Returns an item that calls `f` on every ajax request executed in
+  `item`. The function may return an ajax response, in which case the
+  request isn't actually executed, but results in the returned response
+  instead.
+
+  If the function returns `nil`, the request is executed as
+  normal. Note that this means you can pass in a map as `f`, mapping
+  requests to responsed."
+    [item f]
+    ;; It used to be possible that f returns c/no-effect to turn request 'off'. But who want's that?
+    (tu/map-subscriptions item (f/partial h f))))
