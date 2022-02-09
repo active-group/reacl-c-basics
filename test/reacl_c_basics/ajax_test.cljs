@@ -3,93 +3,73 @@
             [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom]
             [reacl-c.test-util.core :as tuc :include-macros true]
-            [reacl-c.test-util.test-renderer :as tu]
+            [reacl-c.test-util.dom-testing :as dt]
             [active.clojure.functions :as f]
             [active.clojure.lens :as lens]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
 
-(defn after [ms thunk]
-  (js/window.setTimeout thunk
-                        ms))
+(c/defn-subscription set-atom! deliver! [atom value]
+  (reset! atom value)
+  (fn [] nil))
 
-(defn dummy-ajax [started raw-response]
-  (fn [uri options]
-    (when started (reset! started true))
-    (when-let [[ok? response] raw-response]
-      (js/window.setTimeout (fn []
-                              (if ok?
-                                ((:handler options) response)
-                                ((:error-handler options) response)))
-                            0))))
+(c/defn-subscription sync! deliver! [value]
+  (deliver! value)
+  (fn [] nil))
 
-(defn maybe-execute-effects! [env ret]
-  ;; TODO: should not require internals of reacl-c
-  ;; TODO: maybe an :execute-effects? option to 'tu/env' (with a replacement handler?)
-  (doseq [a (filter reacl-c.base/effect? (:actions ret))]
-    ;; Note: generally, could return new 'returns'
-    (tu/execute-effect! env a)))
+(c/defn-subscription async! deliver! [value]
+  (let [id (js/setTimeout #(deliver! value) 0)]
+    (fn []
+      (js/clearTimeout id))))
+
+(c/defn-subscription reveal deliver! [a]
+  (reset! a deliver!)
+  (fn [] (reset! a nil)))
+
+(defn does-execute? [request item & [state]]
+  (let [started (atom false)]
+    (dt/rendering
+     (-> item
+         (tuc/map-subscriptions {(ajax/execute request) (set-atom! started true)}))
+     :state state
+     (fn [env]
+       @started))))
 
 (deftest fetch-once-start-test
-  (async done
-         (let [started (atom false)
-               dummy (dummy-ajax started [true ::value])]
-           (let [env (tu/env (ajax/fetch-once (ajax/request dummy "uri")
-                                              (fn [_ _]
-                                                (js/window.setTimeout done 0)
-                                                (c/return))))]
-             (is (not @started))
-             (maybe-execute-effects! env (tu/mount! env nil))
-             (is @started)))))
+  ;; request is executed on mount.
+  (let [request (ajax/GET "http://invalid.invalid")]
+    (is (does-execute? request (ajax/fetch-once request
+                                                (fn [_ _]
+                                                  (c/return)))))))
 
-(deftest fetch-once-ok-test
-  (async done
-         (let [dummy (dummy-ajax nil [true ::value])]
-           (let [env (tu/env (ajax/fetch-once (ajax/request dummy "uri")
-                                              (fn [state response]
-                                                (is (ajax/response-ok? response))
-                                                (is (= ::value (ajax/response-value response)))
-                                                (js/window.setTimeout done 0)
-                                                (c/return))))]
-             (maybe-execute-effects! env (tu/mount! env nil))))))
+(deftest fetch-once-response-test
+  ;; returns the response.
+  (let [response (atom nil)
+        resp (ajax/ok-response ::value)
+        request (ajax/GET "http://invalid.invalid")]
+    (dt/rendering
+     (-> (ajax/fetch-once request
+                          (fn [_ r]
+                            (reset! response r)
+                            (c/return)))
+         (tuc/map-subscriptions {(ajax/execute request) (sync! resp)}))
+     (fn [env]
+       (is (= @response resp))))))
 
-(deftest fetch-once-failure-test
-  (async done
-         (let [dummy (dummy-ajax nil [false {:v ::error}])]
-           (let [env (tu/env (ajax/fetch-once (ajax/request dummy "uri")
-                                              (fn [state response]
-                                                (is (not (ajax/response-ok? response)))
-                                                (is (= {:v ::error} (ajax/response-value response)))
-                                                (js/window.setTimeout done 0)
-                                                (c/return))))]
-             (maybe-execute-effects! env (tu/mount! env nil))))))
-
-(deftest fetch-once-convert-test
-  (async done
-         (let [dummy (dummy-ajax nil [true ::value])]
-           (let [env (tu/env (ajax/fetch-once (-> (ajax/request dummy "uri")
-                                                  (ajax/map-response (fn [response]
-                                                                       (is (ajax/response-ok? response))
-                                                                       (is (= ::value (ajax/response-value response)))
-                                                                       ::other-value)))
-                                              (fn [state response]
-                                                (is (= ::other-value response))
-                                                (js/window.setTimeout done 0)
-                                                (c/return))))]
-             (maybe-execute-effects! env (tu/mount! env nil))))))
-
-(deftest fetch-once-convert-2-test
-  (async done
-         (let [dummy (dummy-ajax nil [true ::value])]
-           (let [env (tu/env (ajax/fetch-once (-> (ajax/request dummy "uri")
-                                                  (ajax/map-ok-response (fn [value]
-                                                                          (is (= ::value value))
-                                                                          ::other-value)))
-                                              (fn [state response]
-                                                (is (ajax/response-ok? response))
-                                                (is (= ::other-value (ajax/response-value response)))
-                                                (js/window.setTimeout done 0)
-                                                (c/return))))]
-             (maybe-execute-effects! env (tu/mount! env nil))))))
+(deftest fetch-once-map-response-test
+  (let [response (atom nil)
+        resp1 (ajax/ok-response ::value)
+        resp2 (ajax/error-response ::error)
+        request (-> (ajax/GET "http://invalid.invalid")
+                    (ajax/map-response (constantly resp2)))]
+    (dt/rendering
+     (-> (ajax/fetch-once request
+                          (fn [_ r]
+                            (reset! response r)
+                            (c/return)))
+         ;; TODO: should there be a helper fn to do the conversion?
+         (tuc/map-subscriptions {(ajax/execute request) (sync! ((get-in request [:options :convert-response]) resp1))}))
+     (fn [env]
+       (is (= @response resp2))))))
 
 (defn execute-dummy [result]
   (let [a (c/return :action result)]
@@ -100,57 +80,53 @@
         (c/fragment)))))
 
 (deftest fetch-test
-  ;; fetch puts the response into a slot in the state.
-  (let [resp (ajax/ok-response :value)
-        env (tu/env (ajax/fetch (ajax/GET "/url")))]
-    (tuc/provided [ajax/execute (execute-dummy resp)]
-                  ;; fetch when state nil
-                  (is (= (c/return :state resp)
-                         (tu/mount! env nil)))
-                  ;; do not fetch when some state.
-                  (is (= (c/return)
-                         (tu/mount! env resp))))))
+  (let [request (ajax/GET "http://invalid.invalid")]
+    ;; makes request when state is nil.
+    (is (does-execute? request (ajax/fetch request) nil))
+
+    ;; does not, when state is not nil.
+    (is (not (does-execute? request (ajax/fetch request) :some)))))
 
 (deftest fetch-when+state-test
-  ;; fetch-when puts the response into a slot in the state, and refetches on condition.
-  (let [resp (ajax/ok-response :value)
-        env (tu/env (c/with-state-as [resp fetch?]
-                      (c/focus lens/first
-                               (ajax/fetch-when+state (ajax/GET "/url") fetch?))))]
-    (tuc/provided [ajax/execute (execute-dummy resp)]
-                  ;; fetch when state nil
-                  (is (= (c/return :state [[resp false] true])
-                         (tu/mount! env [[nil nil] true])))
-                 
-                  ;; do not fetch when some state.
-                  (is (= (c/return)
-                         (tu/mount! env [[nil nil] false])))
+  ;; does nothing if condition is false.
+  (let [request (ajax/GET "http://invalid.invalid")]
+    (is (not (does-execute? request (ajax/fetch-when request false) nil))))
 
-                  ;; fetch once later.
-                  (is (= (c/return :state [[resp false] true])
-                         (tu/update! env [[nil nil] true])))
+  ;; fetch-when is just fetch-when+state without the loading-state.
+  (is (= (ajax/fetch-when (ajax/GET "/url") true)
+         (c/local-state nil (ajax/fetch-when+state (ajax/GET "/url") true))))
+  
+  ;; puts the response into a slot in the state, and refetches on condition.
+  (let [request (ajax/GET "http://invalid.invalid")
+        response1 (ajax/ok-response ::value)
+        response2 (ajax/ok-response ::other-value)
+        deliver! (atom nil)
+        set-state! (atom nil)
+        last-state (atom nil)]
 
-                  ;; and refetch maybe.
-                  (is (= (c/return)
-                         (tu/update! env [[resp nil] false])))
-                  ;; Note: the :state update would be optimized away,
-                  ;; when the response is identical (it does another
-                  ;; fetch nevertheless, but in this test we need a
-                  ;; different response):
-                  (let [resp2 (ajax/ok-response :value2)]
-                    (tuc/provided [ajax/execute (execute-dummy resp2)]
-                                  (is (= (c/return :state [[resp2 false] true])
-                                         (tu/update! env [[resp nil] true])))))
-                  )
-    ;; and when request is not completed, loading state stays true
-    (tuc/provided [ajax/execute (constantly c/empty)]
-                  (is (= (c/return :state [[nil true] true])
-                         (tu/mount! env [[nil nil] true]))))
+    (dt/rendering
+     (-> (c/fragment (c/with-state-as [_ fetch?]
+                       (c/focus lens/first (ajax/fetch-when+state request fetch?)))
+                     (c/dynamic (fn [st]
+                                  (reset! last-state st)
+                                  nil))
+                     (c/with-async-return (fn [f] (reset! set-state! f) nil)))
+         (tuc/map-subscriptions {(ajax/execute request) (reveal deliver!)}))
+     :state [[nil false] true]
+     (fn [env]
+       ;; pending initially
+       (is (= @last-state [[nil true] true]))
+       ;; when request done, not pending anymore
+       (@deliver! response1)
+       (is (= @last-state [[response1 false] true]))
 
-    ;; fetch-when is just fetch-when+state without the loading-state.
-    (is (= (ajax/fetch-when (ajax/GET "/url") true)
-           (c/local-state nil (ajax/fetch-when+state (ajax/GET "/url") true))))
-    ))
+       ;; does fetch again if condition changes to true.
+       (@set-state! [[response1 false] false])
+       (@set-state! [[response1 false] true])
+       (@deliver! response2)
+       (is (= @last-state [[response2 false] true]))
+       )))
+  )
 
 ;; TODO show-response-value ?
 
@@ -158,34 +134,38 @@
   (is (= (ajax/GET "/url") (ajax/GET "/url"))))
 
 (deftest delivery-test
-  (let [req  (ajax/GET "/url")
-        job (ajax/delivery-job! req :info)
+  (async done
+         (-> (let [req  (ajax/GET "http://invalid.invalid")
+                   resp (ajax/ok-response :v)
+                   result (atom nil)
 
-        resp (ajax/ok-response :value)
+                   deliver! (atom nil)
+                   states (atom [])]
+               (testing "starts running a job and completes eventually"
+                 (dt/rendering
+                  (-> (ajax/delivery (dom/button {:data-testid "btn"
+                                                  :onclick (fn [_ _]
+                                                             (c/return :action (ajax/deliver req :info)))})
+                                     (fn transition [state job]
+                                       (swap! states conj (ajax/delivery-job-status job))
+                                       (when (ajax/completed? job)
+                                         (reset! result (ajax/delivery-job-response job)))
+                                       (c/return)))
+                      (tuc/map-subscriptions {(ajax/execute req) (async! resp)}))
+                  (fn [env]
+                    ;; nothing happens initially.
+                    (is (= [] @states))
 
-        program (c/name-id "program")
-        prog (c/named program (dom/div))
+                    ;; deliver a job
+                    (dt/fire-event (dt/get env (dt/by-test-id "btn")) :click)
+                    (is (= [:pending :running] @states))
 
-        add-status (fn [states state job]
-                     (let [st  (ajax/delivery-job-status job)]
-                       (swap! states conj st)
-                       (c/return :state (conj state st))))
-        
-        mk-env (fn [states]
-                 (tu/env (ajax/delivery prog
-                                        (f/partial add-status states))))]
-    (testing "starts running a job and completes eventually"
-      (let [states (atom [])
-            env (mk-env states)]
-        ;; Note: it completes immediately, because of our fetch-once-dummy
-        (tuc/provided [ajax/execute (execute-dummy resp)]
-                      (tu/mount! env [])
-
-                      (let [r (tu/inject-action! (tu/find-named env program)
-                                                 job)]
-                        ;; currently not properly testable, due to limitation/bug of the React test-renderer.
-                        #_(is (= (c/return :state [:pending :running :completed])
-                                 r)))
-                      ;; will go immediately from pending to running.
-                      (is (= [:pending :running :completed]
-                             @states)))))))
+                    ;; getting completed state/response, asynchronously.
+                    (new js/Promise.
+                         (fn [resolve reject]
+                           (js/setTimeout (fn []
+                                            (is (= [:pending :running :completed] @states))
+                                            (is (= resp @result))
+                                            (resolve :done))
+                                          1)))))))
+             (.then (fn [_] (done))))))
