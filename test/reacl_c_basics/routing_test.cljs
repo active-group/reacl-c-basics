@@ -2,7 +2,7 @@
   (:require [reacl-c-basics.pages.core :as routing]
             [reacl-c.core :as c]
             [reacl-c.dom :as dom]
-            [reacl-c.test-util.test-renderer :as tu]
+            [reacl-c.test-util.dom-testing :as dt]
             [reacl-c-basics.pages.routes :as routes :include-macros true]
             [reacl-c-basics.pages.history :as history]
             [reacl-basics.pages.history :as rhistory]
@@ -38,28 +38,21 @@
                    (start! [_ nav-path! path-exists?]
                      (reset! hist-nav! nav-path!))
                    (stop! [_]
-                     (reset! hist-nav! nil)))
+                     (reset! hist-nav! nil)))]
 
-                 main (routing/history-router test-history pages)
+             (dt/rendering
+              (routing/history-router test-history pages)
+              :state "state"
+              (fn [env]
 
-                 env (tu/env main)
+                ;; "/home" initially, showing the homepage with the application state:
+                (is (some? (dt/get env (dt/by-text "Homepage state"))))
 
-                 doms-with-tag (fn [tag]
-                                 (tu/find-all env tag))
-                 dom-content (fn [c]
-                               (apply str (array-seq (.-children c))))]
-
-             (tu/mount! env "state")
-
-             ;; "/home" initially, showing the homepage with the application state:
-             (is (= ["Homepage state"]
-                    (map dom-content (doms-with-tag (dom/div)))))
-             
-             ;; emulate a user click on an anchor to go to person page:
-             (js/window.setTimeout
-              (fn []
+                ;; emulate a user click on an anchor to go to person page:
                 (@hist-nav! "/person/123?a=42")
-                (is (= ["Person: 123 42"]
-                       (map dom-content (doms-with-tag (dom/div)))))
-                (done))
-              0)))))
+                (-> (dt/find env (dt/by-text "Person: 123 42"))
+                    (.then (fn [_]
+                             (done))
+                           (fn [e]
+                             (is (nil? e))
+                             (done))))))))))
