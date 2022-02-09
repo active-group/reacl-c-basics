@@ -1,81 +1,87 @@
 (ns reacl-c-basics.forms-test
   (:require [reacl-c-basics.forms :as forms]
+            [reacl-c-basics.forms.core :as fcore]
             [reacl-c.core :as c]
             [reacl-c.dom :as dom]
-            [reacl-c.test-util.test-renderer :as tu]
-            [cljs.test :refer (is deftest testing) :include-macros true]))
+            [reacl-c.test-util.dom-testing :as dt]
+            [reacl-c.main :as main]
+            [cljs.test :refer (is deftest testing async) :include-macros true]))
 
 (deftest form-test
-  (let [e (tu/env (forms/form {:default {:text ""}
-                               :onsubmit (fn [value] (c/return :action [:submit! value]))}
-                              (c/focus :text (forms/input-string))))]
-    (tu/mount! e {:text "abc"})
+  (let [submitted (atom nil)]
+    (dt/rendering
+     (forms/form {:default {:text "def"}
+                  :data-testid "myform"
+                  :onsubmit (fn [value] (reset! submitted value) (c/return))}
+                 (c/focus :text (forms/input-string)))
+     :state {:text "abc"}
+     (fn [env]
+       (is (some? (dt/query env (dt/by-display-value "abc"))))
 
-    ;; reset to default works
-    (is (= (c/return :state {:text ""})
-           (tu/invoke-callback! (tu/find e (dom/form))
-                                :onreset #js {:type "reset"})))
+       ;; reset to default works
+       (dt/fire-event (dt/get env (dt/by-test-id "myform")) :reset)
+       (is (some? (dt/query env (dt/by-display-value "def"))))
+     
+       ;; setting value
+       (dt/fire-event (dt/query env (dt/by-display-value "def"))
+                      :change {:target {:value "foobar"}})
+       (is (some? (dt/query env (dt/by-display-value "foobar"))))
 
-    ;; setting value
-    (is (= (c/return :state {:text "foobar"})
-           (tu/invoke-callback! (tu/find e (dom/input))
-                                :onchange #js {:type "change"
-                                               :target #js {:value "foobar"}})))
-
-    ;; submitting
-    (tu/update! e {:text "foobar"})
-    (is (= (c/return :action [:submit! {:text "foobar"}])
-           (tu/invoke-callback! (tu/find e (dom/form))
-                                :onsubmit #js {:type "submit"
-                                               :preventDefault (fn [] nil)}))))
-
-  )
+       ;; submitting
+       (dt/fire-event (dt/get env (dt/by-test-id "myform")) :submit)
+       (is (= @submitted {:text "foobar"}))
+       ))))
 
 (deftest input-number-test
-  (let [e (tu/env (forms/input-number))
+  (let [last-state (atom nil)
+        item (dom/div (forms/input-number {:type "text" ;; Note: type number makes it harder to simulate invalid input.
+                                           :data-testid "inp"})
+                      (dom/button {:onclick (constantly 21)} "update")
+                      (c/dynamic (fn [v]
+                                   (reset! last-state v)
+                                   (str v))))
 
-        current-input (fn []
-                        (tu/find e (dom/input)))
-        current-text (fn []
-                       (-> (current-input)
-                           (.-props)
+        current-input (fn [e]
+                        (dt/query e (dt/by-test-id "inp")))
+        current-text (fn [e]
+                       (-> (current-input e)
                            (.-value)))
 
-        enter-text (fn [txt]
-                     (let [comp (current-input)]
-                       (tu/invoke-callback! comp :onchange
-                                            #js {:type "change" :target #js {:value txt}})))]
+        enter-text (fn [e txt]
+                     (let [comp (current-input e)]
+                       (dt/fire-event comp :change {:target {:value txt}})))]
 
-    (testing "shows initial value"
-      (is (= (c/return)
-             (tu/mount! e 42)))
-      (is (= "42" (current-text))))
+    (dt/rendering
+     item
+     :state 42
+     ;; :visible? true
+     (fn [e]
+       (testing "shows initial value"
+         (is (= "42" (current-text e))))
 
-    (testing "show updated value"
-      (is (= (c/return)
-             (tu/update! e 21)))
-      (is (= "21" (current-text))))
+       (testing "show updated value"
+         (dt/fire-event (dt/get e (dt/by-text "update")) :click)
+         (is (= "21" (current-text e))))
 
-    (testing "returns value when new valid input"
-      (is (= (c/return :state 10)
-             (enter-text "10"))))
+       (testing "changes state when new valid input"
+         (enter-text e "10")
+         (is (= 10 @last-state)))
 
-    (testing "returns nil but keeps text on invalid input if focused"
-      (tu/invoke-callback! (current-input) :onfocus
-                           #js {:type "focus"})
-      (is (= (c/return :state nil)
-             (enter-text "foobar")))
-      (tu/update! e nil)
-      (is (= "foobar" (current-text))))
+       (testing "state nil but keeps text on invalid input if focused"
+         (dt/fire-event (current-input e) :focus)
+         (enter-text e "foobar")
 
-    (testing "then, on blur, sets the text to the unparsed text."
-      (tu/invoke-callback! (current-input) :onblur
-                           #js {:type "blur"})
-      (is (= "" (current-text))))
-    ))
+         (is (= "foobar" (current-text e)))
+         (is (= nil @last-state)))
+
+       (testing "then, on blur, sets the text to the unparsed text."
+         (dt/fire-event (current-input e) :blur)
+         (is (= "" (current-text e))))   
+       ))))
 
 (deftest select-string-test
   (testing "can take many args"
-    (tu/mount! (tu/env (apply forms/select-string {} (repeat 50 (forms/option {:value 42} "42")))) 42)
-    (is true) ;; ok if it does not fail
-    ))
+    (dt/rendering (apply forms/select-string {} (repeat 50 (forms/option {:value 42} "42")))
+                  (fn [env]
+                    (is true) ;; ok if it does not fail
+                    ))))
