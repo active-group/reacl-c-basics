@@ -12,10 +12,12 @@
         it (-> (c/fragment (ajax/fetch req1)
                            (c/with-state-as st
                              (cond (nil? st) "Pending"
-                                   (ajax/response-ok? st) (str "Ok " (ajax/response-value st))
+                                   (ajax/response-ok? st) "Ok"
                                    :else "Error")))
                (ajax-tu/emulate-requests {req1 ok-res}))]
 
     (dt/rendering it
                   (fn [env]
-                    (is (dt/get env (dt/by-text "Ok :result")))))))
+                    (is (dt/get env (dt/by-text "Ok")))
+                    (is (= ok-res (dt/current-state env)))
+                    ))))

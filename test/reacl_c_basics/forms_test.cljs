@@ -33,13 +33,9 @@
        ))))
 
 (deftest input-number-test
-  (let [last-state (atom nil)
-        item (dom/div (forms/input-number {:type "text" ;; Note: type number makes it harder to simulate invalid input.
+  (let [item (dom/div (forms/input-number {:type "text" ;; Note: type number makes it harder to simulate invalid input.
                                            :data-testid "inp"})
-                      (dom/button {:onclick (constantly 21)} "update")
-                      (c/dynamic (fn [v]
-                                   (reset! last-state v)
-                                   (str v))))
+                      (dom/button {:onclick (constantly 21)} "update"))
 
         current-input (fn [e]
                         (dt/query e (dt/by-test-id "inp")))
@@ -65,14 +61,14 @@
 
        (testing "changes state when new valid input"
          (enter-text e "10")
-         (is (= 10 @last-state)))
+         (is (= 10 (dt/current-state e))))
 
        (testing "state nil but keeps text on invalid input if focused"
          (dt/fire-event (current-input e) :focus)
          (enter-text e "foobar")
 
          (is (= "foobar" (current-text e)))
-         (is (= nil @last-state)))
+         (is (= nil (dt/current-state e))))
 
        (testing "then, on blur, sets the text to the unparsed text."
          (dt/fire-event (current-input e) :blur)

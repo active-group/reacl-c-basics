@@ -100,31 +100,25 @@
   (let [request (ajax/GET "http://invalid.invalid")
         response1 (ajax/ok-response ::value)
         response2 (ajax/ok-response ::other-value)
-        deliver! (atom nil)
-        set-state! (atom nil)
-        last-state (atom nil)]
+        deliver! (atom nil)]
 
     (dt/rendering
-     (-> (c/fragment (c/with-state-as [_ fetch?]
-                       (c/focus lens/first (ajax/fetch-when+state request fetch?)))
-                     (c/dynamic (fn [st]
-                                  (reset! last-state st)
-                                  nil))
-                     (c/with-async-return (fn [f] (reset! set-state! f) nil)))
+     (-> (c/with-state-as [_ fetch?]
+           (c/focus lens/first (ajax/fetch-when+state request fetch?)))
          (tuc/map-subscriptions {(ajax/execute request) (reveal deliver!)}))
      :state [[nil false] true]
      (fn [env]
        ;; pending initially
-       (is (= @last-state [[nil true] true]))
+       (is (= (dt/current-state env) [[nil true] true]))
        ;; when request done, not pending anymore
        (@deliver! response1)
-       (is (= @last-state [[response1 false] true]))
+       (is (= (dt/current-state env) [[response1 false] true]))
 
        ;; does fetch again if condition changes to true.
-       (@set-state! [[response1 false] false])
-       (@set-state! [[response1 false] true])
+       (dt/set-state! env [[response1 false] false])
+       (dt/set-state! env [[response1 false] true])
        (@deliver! response2)
-       (is (= @last-state [[response2 false] true]))
+       (is (= (dt/current-state env) [[response2 false] true]))
        )))
   )
 
