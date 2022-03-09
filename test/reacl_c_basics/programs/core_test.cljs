@@ -275,25 +275,27 @@
                       (c/handle-error (fn [[st _]]
                                         [st false]))))))
 
-(c/defn-effect set-console-error! [f]
-  (set! (.-error js/console) f))
+(c/defn-subscription capturing-console-error deliver! [f]
+  (let [orig (.-error js/console)]
+    (set! (.-error js/console) (fn [& args]
+                                 (when-let [a (f args orig)]
+                                   (deliver! a))))
+    (deliver! ::installed)
+    (fn []
+      (set! (.-error js/console) orig))))
 
 (defn with-capturing-console-error [item f]
-  (c/local-state nil
+  (c/local-state false
                  (c/fragment
-                  (c/once (fn [[s st]]
-                            (let [orig (.-error js/console)
-                                  h (fn [& args] ;; must be a real fn.
-                                      (f args orig))]
-                              (if (nil? st)
-                                (c/return :state [s orig]
-                                          :action (set-console-error! h))
-                                (c/return))))
-                          (fn [[_ orig]]
-                            (c/return :action (set-console-error! orig))))
-                  (c/dynamic (fn [[_ st]]
-                               (when (some? st)
-                                 (c/focus lens/second item)))))))
+                  (c/focus lens/second
+                           (-> (capturing-console-error f)
+                               (c/handle-action (fn [state a]
+                                                  (if (= a ::installed)
+                                                    (c/return :state true)
+                                                    (c/return :action a))))))
+                  (c/dynamic (fn [[_ installed?]]
+                               (when installed?
+                                 item))))))
 
 (defn current-component-stack []
   ;; an item that emits the current component stack as an action.
@@ -301,15 +303,15 @@
   ;; this is quite hacky, and might well fail in future React
   ;; versions: We try to capture the console error that react prints
   ;; when an exception is thrown, which lists the component hierarchy.
-  (c/with-async-actions
-    (fn [emit!]
-      (with-capturing-console-error
-        (throw-once)
-        (fn [args original]
-          (if (and (string? (first args))
-                   (.startsWith (first args) "The above error occurred in"))
-            (emit! (first args))
-            (apply original args)))))))
+  (with-capturing-console-error
+    (throw-once)
+    (fn [args original]
+      (if (and (string? (first args))
+               (.startsWith (first args) "The above error occurred in"))
+        (first args)
+        (do 
+          (apply original args)
+          nil)))))
 
 (defn with-size-of-component-structure [f]
   (let [top (atom nil)
