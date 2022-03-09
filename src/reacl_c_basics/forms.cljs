@@ -23,7 +23,7 @@
 (defn- value-state [_ e]
   (c/return :state (.. e -target -value)))
 
-(c/defn-item ^:private input-value [f fixed-attrs attrs children]
+(defn ^:private input-value [f fixed-attrs attrs children]
   (c/with-state-as value
     (apply f (dom/merge-attributes fixed-attrs
                                    {:value value
@@ -42,14 +42,13 @@
          v (parse mod-text)]
      [v mod-text])))
 
-(c/defn-item ^:no-doc input-parsed* [parse restrict & args]
-  (c/with-state-as [value text]
-    ;; state = [value text] on the currently parsed value (or nil if not possible), and the actual text entered/shown.
-    ;; (parse string) => value
-    ;; (restrict prev-text next-text) => string, preventing some input while typing.
-    (let [[attrs content] (core/split-dom-attrs args)]
-      (c/focus (f/partial input-parsed-lens* parse restrict)
-               (apply input-string attrs content)))))
+(defn ^:no-doc input-parsed* [parse restrict & args]
+  ;; state = [value text] on the currently parsed value (or nil if not possible), and the actual text entered/shown.
+  ;; (parse string) => value
+  ;; (restrict prev-text next-text) => string, preventing some input while typing.
+  (let [[attrs content] (core/split-dom-attrs args)]
+    (c/focus (f/partial input-parsed-lens* parse restrict)
+             (apply input-string attrs content))))
 
 (defn- input-parsed-lens
   ([unparse [value {text :text focused? :focused?}]]
@@ -77,20 +76,19 @@
                                          (assoc 0 (parse (get-in state [1 :text])))
                                          ))
                       (c/return :action a)))]
-  (c/defn-item ^:no-doc input-parsed [parse unparse restrict & args]
-    (c/with-state-as value
-      ;; this keeps the text the user entered, iff and as long as the input has the focus, and changes it to (unparse value) otherwise.
-      ;; Note: use input-parsed* if you need to distinguish between 'no input' and 'invalid input'.
-      (let [[attrs content] (core/split-dom-attrs args)]
-        (c/local-state {:text ""
-                        :focused? false}
-                       (-> (c/focus (f/partial input-parsed-lens unparse)
-                                    (apply input-parsed* parse restrict
-                                           (assoc attrs
-                                                  :onfocus (f/partial set-focused-a true)
-                                                  :onblur (f/partial set-focused-a false))
-                                           content))
-                           (c/handle-action (f/partial set-focused parse unparse))))))))
+  (defn ^:no-doc input-parsed [parse unparse restrict & args]
+    ;; this keeps the text the user entered, iff and as long as the input has the focus, and changes it to (unparse value) otherwise.
+    ;; Note: use input-parsed* if you need to distinguish between 'no input' and 'invalid input'.
+    (let [[attrs content] (core/split-dom-attrs args)]
+      (c/local-state {:text ""
+                      :focused? false}
+                     (-> (c/focus (f/partial input-parsed-lens unparse)
+                                  (apply input-parsed* parse restrict
+                                         (assoc attrs
+                                                :onfocus (f/partial set-focused-a true)
+                                                :onblur (f/partial set-focused-a false))
+                                         content))
+                         (c/handle-action (f/partial set-focused parse unparse)))))))
 
 (defn- parse-number [s]
   ;; Note: "" parses as NaN although it's not isNaN; parseFloat ignores trailing extra chars; but isNaN does not:
