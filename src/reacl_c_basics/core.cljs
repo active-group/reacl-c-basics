@@ -16,12 +16,24 @@
       (apply f attrs children))))
 
 (c/defn-subscription animation-frame
-  "Subscription to the browser's animation frames, emitting the timestamps as actions."
+  "Subscription to a single animation frame, emitting the timestamp as an action."
   deliver! []
-  (let [id (js/window.requestAnimationFrame (fn [timestamp]
-                                              (deliver! timestamp)))]
+  (let [id (js/window.requestAnimationFrame deliver!)]
     (fn []
       (js/window.cancelAnimationFrame id))))
+
+(c/defn-subscription animation-frames
+  "Subscription to the browser's animation frames, continuously emitting the timestamp as actions."
+  deliver! []
+  (let [id (atom nil)
+        start (fn next []
+                (js/window.requestAnimationFrame (fn [timestamp]
+                                                   (deliver! timestamp)
+                                                   (next))))]
+    (start)
+    (fn []
+      (when-let [v @id]
+        (js/window.cancelAnimationFrame v)))))
 
 (c/defn-subscription timeout
   "Subscription to a timer, emitting `true` or `action` as an action once, after they given number of milliseconds."
