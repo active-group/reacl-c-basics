@@ -1,6 +1,5 @@
 (ns reacl-c-basics.forms-test
   (:require [reacl-c-basics.forms :as forms]
-            [reacl-c-basics.forms.core :as fcore]
             [reacl-c.core :as c]
             [reacl-c.dom :as dom]
             [reacl-c.test-util.dom-testing :as dt]
