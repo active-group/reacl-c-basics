@@ -1,5 +1,29 @@
 (ns reacl-c-basics.programs.core
-  "Programs are an abstraction over items, that have a dedicated result, and form an async monad."
+  "Programs are an abstraction over items, that have a dedicated result, and form an async monad.
+
+  You will usually start with an item that allows some user interactions when the program is 'running', like
+
+  ```
+  (c/defn-item my-form [running?]
+    (dom/button {:disabled (not running?)
+                 :onClick (fn [v _] (c/return :action \"done\"))}))
+  ```
+
+  Then define a program that runs that
+
+  ```
+  (defn-program my-program []
+    [res (await-action my-form)]
+    (show (dom/div res)))
+  ```
+
+  And then add running this program into your application
+
+  ```
+  (dom/div \"My program:\" (runner (my-program)))
+  ```
+  
+  "
   (:require #?(:cljs [reacl-c.core :as c :include-macros true])
             #?(:clj [reacl-c.core :as c])
             #?(:cljs [active.clojure.cljs.record :as r :include-macros true])
@@ -161,19 +185,12 @@
     [f program]
     (wrap* (f/partial wrap-f f) program)))
 
-#_(letfn [(wrap-f [f item _]
-          (f item))]
-  (defn wrap-running
-    "A program wrapped in some additional markup, via `(f item)`, where
-  `item` is the item representing the program in the running
-  state. The non-running item is not modified."
-    [f program]
-    (eager (f (running program)) (not-running program))))
-
 (defn fmap
   "A program that applies f to the result of the given program."
   [f program]
   (then program (f/comp return f)))
+
+(defn- snd [a b] b)
 
 (let [check-state (fn [done-state? prev new]
                     (if (and (not (done-state? prev))
@@ -185,43 +202,38 @@
                            (c/merge-returned (check-state done-state? prev new)
                                              (c/return :state new)))]
   (defn await-state
-    "A program that shows the given item to start it, until its state is a
-  non-nil value, or the given predicate holds, returning that value as
-  the program's result. Shows `not-running` when the program is not
-  running, which defaults to [[reacl-c.core/empty]]."
-    [item & [done-state? not-running]]
-    ;; TODO: help with an item that should not be running on the whole program state? isolate-state, local-state not easy... await-local-state ?
+    "A program that shows the item returned by `(f running?)`, until
+  its state is a non-nil value, or the given predicate holds,
+  returning that value as the program's result."
+    [f & [done-state?]]
     (eager
      (let [done-state? (or done-state? some?)]
        (-> (c/fragment
-            item
+            (f true)
             (c/once
              ;; check initial state; could be done already
              (f/partial check-state done-state?)))
            (c/handle-state-change
             (f/partial check-state-change done-state?))))
-     not-running)))
+     ;; Note: should ideally have the same structure when running or not running
+     (-> (f false)
+         (c/handle-state-change snd)))))
 
-#_(defn await-state* [f & [done-state?]]
-  (await-state (f true) done-state? (f false)))
-
-(let [f (fn [pred a]
+(let [g (fn [pred a]
           (if (pred a)
             (done a)
             a))]
   (defn await-action
-    "A program that shows the given item to start it, until it emits an
-  action where the given predicate holds, which is then returned as
-  the programs result. Shows `not-running` when the program is not
-  running, which defaults to [[reacl-c.core/empty]]."
-    [item pred & [not-running]]
-    (eager
-     (-> item
-         (c/map-actions (f/partial f pred)))
-     not-running)))
-
-#_(defn await-action* [f pred]
-  (await-action (f true) pred (f false)))
+    "A program that shows the item returned by `(f running?)`, until it
+  emits an action where the given predicate holds, which is then
+  returned as the programs result. If no predicate is specified, then
+  any action will be taken as the result of the program."
+    [f & [pred]]
+    (with (fn [running?]
+            (-> (f running?)
+                (c/map-actions (if running?
+                                 (if (some? pred) (f/partial g pred) done)
+                                 identity)))))))
 
 (let [k (fn k [program programs]
           (if (empty? programs)

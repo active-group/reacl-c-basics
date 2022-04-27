@@ -48,9 +48,9 @@
                                     ;; TODO: need to test it for all primitives?
                                     #_(p/return 42)
                                     #_(p/race (p/show "42") (p/then (p/return 21) (fn [x] (p/return (* 2 x)))))
-                                    #_(p/await-state (c/init 42))
-                                    (p/race (p/show "42") (p/await-state (c/init 42)))
-                                    #_(p/await-action (c/init (c/return :action 42))
+                                    #_(p/await-state #(c/init 42))
+                                    (p/race (p/show "42") (p/await-state #(when % (c/init 42))))
+                                    #_(p/await-action #(c/init (c/return :action 42))
                                                       int?)
                                     (fn [st res]
                                       (assert (= res 42))
@@ -128,7 +128,7 @@
 
 (deftest await-state-test-1
   (is (= "4" (run-sync
-              (p/await-state (c/init "4")
+              (p/await-state #(when % (c/init "4"))
                              #(= % "4"))))))
 
 (at/deftest await-state-test-2
@@ -136,7 +136,8 @@
    (is (= "4"
           (a/await
            (run-async
-            (p/await-state (dom/button {:onclick (constantly "4")} "click")
+            (p/await-state (fn [running?]
+                             (dom/button {:onclick (constantly "4") :disabled (not running?)} "click"))
                            #(= % "4"))
             (fn [env]
               (a/async
@@ -144,7 +145,7 @@
 
 (deftest await-action-test-1
   (is (= "4" (run-sync
-              (p/await-action (c/init (c/return :action "4"))
+              (p/await-action #(when % (c/init (c/return :action "4")))
                               string?)))))
 
 (at/deftest await-action-test-2
@@ -152,7 +153,8 @@
    (is (= "4"
           (a/await
            (run-async
-            (p/await-action (dom/button {:onclick (constantly (c/return :action "4"))} "click")
+            (p/await-action (fn [running?]
+                              (dom/button {:onclick (constantly (c/return :action "4")) :disabled (not running?)} "click"))
                             string?)
             (fn [env]
               (a/async
@@ -234,9 +236,9 @@
 
   (is (= (p/show "42") (p/show "42")))
 
-  (is (= (p/await-action c/empty empty?) (p/await-action c/empty empty?)))
+  (is (= (p/await-action (f/constantly c/empty) empty?) (p/await-action (f/constantly c/empty) empty?)))
 
-  (is (= (p/await-state c/empty :foo) (p/await-state c/empty :foo))))
+  (is (= (p/await-state (f/constantly c/empty) :foo) (p/await-state (f/constantly c/empty) :foo))))
 
 (let [eh (fn [ev]
            (.preventDefault ev))]
@@ -321,7 +323,7 @@
                             (c/refer item ref))))
             (f (fn [_]
                  (p/fmap count
-                         (p/await-action (current-component-stack)
+                         (p/await-action #(current-component-stack)
                                          string?)))))))
 
 (at/deftest test-tail-recursiveness-test
