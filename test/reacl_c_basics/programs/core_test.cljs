@@ -182,12 +182,11 @@
         p (p/then (p/return nil)
                   (fn [r]
                     (p/wrap (fn [item]
-                              (c/fragment item
-                                          (c/init (c/return :action foo))))
+                              (c/fragment item (c/init (c/return :action foo))))
                             (p/return 42))))]
     (is (= 42
-           (run-sync (p/sequ p p))))
-    (is (= 2 @cnt))))
+           (run-sync (p/sequ p p p))))
+    (is (= 3 @cnt))))
 
 (deftest par-test-1
   (is (= [:a :b]
@@ -233,7 +232,7 @@
         f (partial dom/div)]
     (is (= (p/wrap f p) (p/wrap f p))))
 
-  (is (= (p/show 42) (p/show 42)))
+  (is (= (p/show "42") (p/show "42")))
 
   (is (= (p/await-action c/empty empty?) (p/await-action c/empty empty?)))
 
@@ -325,7 +324,20 @@
                          (p/await-action (current-component-stack)
                                          string?)))))))
 
-(at/deftest tail-recursiveness
+(at/deftest test-tail-recursiveness-test
+  (let [size-of (fn [N]
+                  (run-async (with-size-of-component-structure
+                               (fn [k]
+                                 (apply p/sequ (concat (repeat N (p/return 0))
+                                                       [(p/then (p/return nil) k)]))))
+                             
+                             nil :init 1000))]
+    (a/async
+     ;; to check the above technique seems to be working:
+     (is (not= 0 (a/await (size-of 1))))
+     (is (= (a/await (size-of 2)) (a/await (size-of 2)))))))
+
+(at/deftest sequ-tail-recursiveness
   (let [size-of (fn [N]
                   (run-async (with-size-of-component-structure
                                (fn [k]
@@ -337,13 +349,27 @@
      (fn []
        ))
     (a/async
-     ;; to check the above technique seems to be working:
-     (is (not= 0 (a/await (size-of 1))))
-     (is (= (a/await (size-of 2)) (a/await (size-of 2))))
-     
      (is (not (< (a/await (size-of 2))
                  (a/await (size-of 4))
                  (a/await (size-of 8))
                  (a/await (size-of 16))))))
     ))
 
+(at/deftest trampoline-tail-recursiveness
+  (let [p (fn p [n]
+            (if (> n 0)
+              (p/then (p/return nil) (fn [_] (p/return (p (dec n)))))
+              (p/return nil)))
+        size-of (fn [N]
+                  (run-async (with-size-of-component-structure
+                               (fn [k]
+                                 (p/trampoline
+                                  (p/return (p N)))))
+                             
+                             nil :init 1000))]
+    (a/async
+     (is (not (< (a/await (size-of 2))
+                 (a/await (size-of 4))
+                 (a/await (size-of 8))
+                 (a/await (size-of 16))))))
+    ))
