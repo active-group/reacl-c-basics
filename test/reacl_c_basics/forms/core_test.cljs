@@ -48,3 +48,18 @@
          (is (text-changes-state env node "xxx" foo))
          (is (text-changes-state env node "" nil))
          )))))
+
+(deftest validate-test
+  (dt/rendering
+   (core/input {:type "text"
+                :validate (fn [v] (when (not= v "foo")
+                                    "Not foo"))})
+   :state "bar"
+   (fn [env]
+     (let [node (dt/get env (dt/by-display-value "bar"))]
+       (.reportValidity node)
+       (is (= "Not foo" (.-validationMessage node)))
+       
+       (dt/set-state! env "foo")
+       (.reportValidity node)
+       (is (= "" (.-validationMessage node)))))))
