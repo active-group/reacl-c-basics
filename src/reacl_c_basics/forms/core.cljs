@@ -17,12 +17,14 @@
 
 (c/defn-effect ^:private set-custom-validity! [ref msg]
   (let [input (c/deref ref)]
-    (.setCustomValidity input (or msg ""))))
+    (.setCustomValidity input msg)))
 
 (defn- with-invalid-attr [f attrs & content]
-  (if (contains? attrs :invalid)
+  ;; Note: when :invalid was set before, it must be set to "" (not nil) to remove that state.
+  (if-let [msg (:invalid attrs)]
     (c/with-ref (fn [r]
                   (c/fragment (-> (apply f (dissoc attrs :invalid) content)
+                                  ;; TODO: use :ref attribute (after that's added to reacl-c); allows f to be some wrapper class.
                                   (c/refer r))
                               (c/init (c/return :action (set-custom-validity! r (:invalid attrs)))))))
     (apply f attrs content)))
@@ -32,7 +34,8 @@
 
 (defn- with-validate-fn [value f attrs & content]
   (apply f (if (contains? attrs :validate)
-             (dom/merge-attributes {:invalid ((:validate attrs) value)}
+             (dom/merge-attributes (when-let [f (:validate attrs)]
+                                     {:invalid (f value)})
                                    (dissoc attrs :validate))
              attrs)
          content))
