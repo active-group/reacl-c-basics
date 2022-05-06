@@ -11,7 +11,8 @@
                  [de.active-group/reacl-c "0.10.13"]
                  [de.active-group/reacl-basics "0.1.2"]
                  [cljs-ajax "0.7.5"]
-                 [clj-commons/cljss "1.6.4" :scope "provided"]]
+                 [clj-commons/cljss "1.6.4" :scope "provided"]
+                 [nubank/workspaces "1.1.2" :scope "provided"]]
 
   :plugins [[lein-codox "0.10.7"]
             [lein-auto "0.1.3"]]
