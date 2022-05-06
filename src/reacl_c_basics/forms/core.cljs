@@ -108,13 +108,34 @@
   (-> type
       (update-in type-attributes dom/merge-attributes attrs)))
 
-(defn- option-value-placeholder [value & [ph-map]]
+(defn- option-value-default-placeholder [value]
+  (cond
+    (nil? value) "" ;; must be the empty string, so that browsers can apply :required attribute for a value of nil.
+    (string? value) value
+    :else (pr-str value)))
+
+(defn- select-single-value [value ph-map]
   (if-let [ph (get ph-map value)]
     ph
-    (cond
-      (nil? value) "" ;; must be the empty string, so that browsers can apply :required attribute for a value of nil.
-      (string? value) value
-      :else (pr-str value))))
+    (option-value-default-placeholder value)))
+
+(defn- select-value [value multiple? ph-map]
+  (if multiple?
+    (to-array (map #(select-single-value % ph-map) value))
+    (select-single-value value ph-map)))
+
+(defn- placeholder-single-value [placeholder ph-map]
+  (if-let [[value _] (first (filter #(= (second %) placeholder) ph-map))]
+    value
+    ;; should be there; complain?
+    placeholder))
+
+(defn- placeholder-multiple-values [placeholders ph-map]
+  (->> (array-seq placeholders)
+       (map #(placeholder-single-value % ph-map))
+       (apply list)
+       ;; return nil instead of empty list (design decision)
+       (not-empty)))
 
 (defrecord ^:private OptionValue [placeholder value])
 
@@ -125,7 +146,7 @@
   [attrs & contents]
   (let [v (:value attrs)
         placeholder (or (:placeholder attrs) ;; overridable, if pr-str is not suitable.
-                        (option-value-placeholder v))]
+                        (option-value-default-placeholder v))]
     ;; replace :value with a (generated) string, and report the actual value as an action to the surrounding select.
     (c/fragment
      (apply dom/option (-> attrs
@@ -140,25 +161,31 @@
   [attrs & options]
   (apply dom/optgroup attrs options))
 
-(let [on-change (fn [[value ph-map] ev]
-                  (let [options (.-options (.-target ev))
-                        placeholder (.-value (.-target ev))
-                        value (if-let [[value _] (first (filter #(= (second %) placeholder) ph-map))]
-                                value
-                                ;; should be there; complain?
-                                placeholder)]
-                    (c/return :state [value ph-map])))
+(let [on-change-single (fn [[value ph-map] ev]
+                         (let [placeholder (.-value (.-target ev))]
+                           (c/return :state [(placeholder-single-value placeholder ph-map) ph-map])))
+      on-change-multiple (fn [[value ph-map] ev]
+                           ;; Note: React's value property not usable in this case..
+                           (let [placeholders (-> (js/Array.from (.-options (.-target ev)))
+                                                  (.filter (fn [^js o]
+                                                             (.-selected o)))
+                                                  (.map (fn [^js o] (.-value o))))]
+                             (c/return :state [(placeholder-multiple-values placeholders ph-map) ph-map])))
       add-placeholder (fn [[st ph-map] a]
                         (if (instance? OptionValue a)
                           (c/return :state [st (assoc ph-map (:value a) (:placeholder a))])
                           (c/return :action a)))]
-  (dom/defn-dom select "A select element that allows options to have arbitrary values."
+  (dom/defn-dom select "A select element that allows options to have
+  arbitrary values. If the `:multiple` attribute is set, then the
+  state of this item must be a list of values or nil."
     [attrs & options]
     ;; Note: the [[option]] elements from this namespace report their value and placeholder via an action.
     (c/with-state-as [value ph-map :local {}]
       (-> (apply (partial with-validate-fn value (partial with-invalid-attr dom/select))
-                 {:value (option-value-placeholder value ph-map)
-                  :onChange on-change}
+                 (dom/merge-attributes
+                  {:value (select-value value (:multiple attrs) ph-map)
+                   :onChange (if (:multiple attrs) on-change-multiple on-change-single)}
+                  attrs)
                  options)
           (c/handle-action add-placeholder)))))
 

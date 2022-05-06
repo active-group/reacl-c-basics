@@ -6,11 +6,12 @@
   },
   "devDependencies": {
     "@testing-library/react": "^11.1.1",
-    "react-test-renderer": "16.14.0",
+    "@testing-library/user-event": "^11.1.1",
     "karma": "^5.2.1",
     "karma-chrome-launcher": "^3.1.0",
     "karma-cljs-test": "^0.1.0",
     "karma-junit-reporter": "^2.0.1",
+    "react-test-renderer": "16.14.0",
     "shadow-cljs": "2.11.7"
   }
 }
