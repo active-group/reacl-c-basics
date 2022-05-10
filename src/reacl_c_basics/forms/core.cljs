@@ -13,7 +13,6 @@
   (:refer-clojure :exclude [type?]))
 
 ;; TODO: support for type=files; incl. "multiple"
-;; TODO: to fully replace forms.cljs: make 'input-parsed' public in a ns? (maybe with 'restrict' feature?), add select-string/simple-select?
 
 (c/defn-effect ^:private set-custom-validity! [ref msg]
   (let [input (c/deref ref)]

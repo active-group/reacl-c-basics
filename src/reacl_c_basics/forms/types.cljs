@@ -9,49 +9,9 @@
             [active.clojure.functions :as f]
             [active.clojure.lens :as lens]
             [reacl-c-basics.forms.core :as core]
+            [reacl-c-basics.forms.parsed :as parsed]
             [clojure.string :as str])
   (:refer-clojure :exclude [extend-type boolean]))
-
-(let [state-change
-      (fn [parse onerror _ [value local]]
-        (try (let [text (or (:text local) "")
-                   v (parse text)]
-               (c/merge-returned (c/return :state [v {:text text :previous v :error nil}])
-                                 (if (some? (:error local))
-                                   (c/call onerror nil)
-                                   (c/return))))
-             (catch :default e
-               (c/merge-returned (c/return :state [value (assoc local :error e)])
-                                 (c/call onerror e)))))
-      
-      actions
-      (fn [unparse onerror [value local] a]
-        (if (= ::reset a)
-          (cond-> (c/return :state [value (assoc local
-                                                 :error nil
-                                                 :text (unparse value))])
-            (:error local) (c/merge-returned (c/call onerror nil)))
-          (c/return :action a)))]
-  (dom/defn-dom ^:private input-parsed-base
-    "Special attributes:
-   ::base must be a fn[attrs] creating the unparsed input
-   ::unparse must return a string
-   if ::parse throws, (:onParseError exn) is emitted, otherwise (:onParseError nil)."
-    [attrs]
-    (c/with-state-as [value local :local {:text nil :previous nil :error nil}]
-      (let [parse (::parse attrs)
-            unparse (::unparse attrs)]
-        (c/fragment
-         ;; init initially, or reinit when new value from outside.
-         (when (or (not= (:previous local) value)
-                   (nil? (:text local)))
-           (c/init [value {:text (unparse value) :previous value :error nil}]))
-       
-         (-> (c/focus (lens/>> lens/second :text (lens/default ""))
-                      ((::base attrs) (dom/merge-attributes {:onBlur (f/constantly (c/return :action ::reset))}
-                                                            (dissoc attrs :onParseError ::base ::parse ::unparse))))
-             (c/handle-state-change (f/partial state-change parse (:onParseError attrs)))
-             (c/handle-action (f/partial actions unparse (:onParseError attrs)))))))))
 
 ;; TODO: document/make public, resp. more user-friendly.
 (defn ^:no-doc new-type [base-fn default-attrs mk-optional]
@@ -73,25 +33,20 @@
   "Creates an input that requires parsing and unparsing of the string
   entered by the user. The function `parse` is called with the string
   entered by the user, and must either return the parsed value of
-  throw [[parse-error]]. The function `unparse` must return a string
-  representing a parsed value."
+  throw [[parsed/parse-error]]. The function `unparse` must return a
+  string representing a parsed value."
   [base-type parse unparse]
   ;; Note: not sure how/if this works when base-type is not a native-type
   (assert (core/type? base-type) (str "Not a type: " (pr-str base-type)))
-  (new-type input-parsed-base
-            (dom/merge-attributes {::base (core/type-base base-type)
-                                   ::parse parse
-                                   ::unparse unparse}
+  (new-type parsed/input-parsed-base
+            (dom/merge-attributes {:base (core/type-base base-type)
+                                   :parse parse
+                                   :unparse unparse}
                                   (core/type-attributes base-type))
             core/string-optional))
 
-(defn parse-error
-  "Returns the error to be thrown on parse errors."
-  [msg & [value]]
-  (js/Error. msg))
-
 (defn- make-parsed [type]
-  (if (some? (::parse (core/type-attributes type)))
+  (if (some? (:parse (core/type-attributes type)))
     type
     (parsed-type type identity identity)))
 
@@ -102,10 +57,10 @@
   `unparse` alike."
   [type parse unparse]
   (-> (make-parsed type)
-      (update-in [core/type-attributes ::parse]
+      (update-in [core/type-attributes :parse]
                  (fn [g]
                    (f/partial parse g)))
-      (update-in [core/type-attributes ::unparse]
+      (update-in [core/type-attributes :unparse]
                  (fn [g]
                    (f/partial unparse g)))))
 
@@ -120,9 +75,9 @@
   (defn restrict-type
     "Creates an input that allows to restrict the parsed value of the
   given type further, by threading it though the given function `f`,
-  which may throw [[parse-error]]. Note that it can be more intuitive
-  for the user to set the input element attribute `:invalid` in some
-  cases."
+  which may throw [[parsed/parse-error]]. Note that it can be more
+  intuitive for the user to set the input element attribute `:invalid`
+  in some cases."
     [type f]
     (extend-type type
       (f/comp f call)
@@ -137,7 +92,7 @@
                  (let [x (when (not (js/isNaN s))
                                (js/parseFloat s))]
                    (if (or (nil? x) (js/isNaN x))
-                     (throw (parse-error "Not a number." s))
+                     (throw (parsed/parse-error "Not a number." s))
                      x)))
                str))
 (def ^{:doc "An input type for an optional number."} opt-number (optional number))
@@ -147,7 +102,7 @@
       (restrict-type (fn [v]
                        (if (integer? v)
                          v
-                         (throw (parse-error "Not an integer." v)))))))
+                         (throw (parsed/parse-error "Not an integer." v)))))))
 (def opt-strict-integer (optional strict-integer))
 
 (def ^{:doc "An input type for a integer number."}
