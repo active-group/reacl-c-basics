@@ -3,8 +3,8 @@
   corresponding states. The [[select]] item also supports any kind
   of values for the [[option]] `:value` attribute, not just strings.
   
-  Additionally, the additional attributes `:invalid` and `:validate`
-  are supported for all of them, allowing for a declarative way to
+  Additionally, the new attributes `:invalid` and `:validate` are
+  supported for all of them, allowing for a declarative way to
   use [[setCustomValidity]] on the dom nodes."
   (:require [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom :include-macros true]
@@ -12,7 +12,8 @@
             [active.clojure.functions :as f])
   (:refer-clojure :exclude [type?]))
 
-;; TODO: support for type=files; incl. "multiple"
+;; Note: this files contains some utils for forms.types, but they are
+;; considered private here.
 
 (c/defn-effect ^:private set-custom-validity! [ref msg]
   (let [input (c/deref ref)]
@@ -72,6 +73,31 @@
 
 (def ^:private input-button-base (partial static-base dom/input))
 
+(c/defn-effect ^:private reset-input! [input-ref]
+  (set! (.-value (c/deref input-ref)) ""))
+
+(let [on-change-single (fn [_ event]
+                         (first (.. event -currentTarget -files)))
+      on-change-multi (fn [_ event]
+                        (.. event -currentTarget -files))
+      maybe-reset (fn [value ref]
+                    ;; we could compare dom element with value here... but just ignore when non-nil comes in for now.
+                    (when (or (nil? value) (empty? value))
+                      (c/init (c/return :action (reset-input! ref)))))]
+  (defn ^:private input-file-base
+    [attrs]
+    ;; The thing with file inputs is that they cannot be 'controlled'; the application cannot chose a file, only the user.
+    ;; So we can only do a state change to what was selected, or to nil (reset selected file)
+    (maybe-with-ref
+     (:ref attrs)
+     (fn [ref]
+       (c/fragment (c/dynamic maybe-reset ref)
+                   (dom/input (dom/merge-attributes {:onChange (if (:multiple attrs)
+                                                                 on-change-multi
+                                                                 on-change-single)
+                                                     :ref ref}
+                                                    attrs)))))))
+
 (defn ^:no-doc new-type [base-fn default-attrs mk-optional]
   ;; Note: base must not be (fundamentally) changed (or, only together with to-optional)
   {::base base-fn
@@ -92,7 +118,7 @@
                   (f/comp g f))))))
 
 (defn ^:no-doc no-optional [type]
-  (throw (js/Error. "This type cannot be made optinoal.")))
+  (throw (js/Error. "This type cannot be made optional.")))
 
 (defn ^:no-doc type? [v]
   (and (map? v) (some? (::base v))))
@@ -105,6 +131,9 @@
     
     ("checkbox" "radio")
     (new-type input-checked-base {:type type} no-optional)
+
+    ("file")
+    (new-type input-file-base {:type type} no-optional) ;; always optional
         
     (new-type input-value-base {:type type} string-optional)))
 
