@@ -12,8 +12,8 @@
             [active.clojure.functions :as f])
   (:refer-clojure :exclude [type?]))
 
-;; TODO: where does :multiple apply; how to support it? files?
-;; TODO: input type=submit and cancel ? we usually use buttons though.
+;; TODO: support for type=files; incl. "multiple"
+;; TODO: to fully replace forms.cljs: make 'input-parsed' public in a ns? (maybe with 'restrict' feature?), add select-string/simple-select?
 
 (c/defn-effect ^:private set-custom-validity! [ref msg]
   (let [input (c/deref ref)]
@@ -59,16 +59,19 @@
 (let [on-change (fn [_ ev]
                   (.-checked (.-target ev)))]
   (defn- checked-base [f attrs]
-    [attrs]
     (c/with-state-as checked
       (with-validate-fn checked (partial input-base f)
         (dom/merge-attributes {:checked (boolean checked)
                                :onChange on-change}
                               attrs)))))
 
+(defn- static-base [f attrs]
+  (c/static f attrs))
 
 (def ^:private input-value-base (partial value-base dom/input))
 (def ^:private input-checked-base (partial checked-base dom/input))
+
+(def ^:private input-button-base (partial static-base dom/input))
 
 (defn ^:no-doc new-type [base-fn default-attrs mk-optional]
   ;; Note: base must not be (fundamentally) changed (or, only together with to-optional)
@@ -98,6 +101,9 @@
 (defn ^:no-doc native-type [type]
   (assert (or (nil? type) (string? type)) type)
   (case type
+    ("submit" "cancel")
+    (new-type input-button-base {:type type} no-optional)
+    
     ("checkbox" "radio")
     (new-type input-checked-base {:type type} no-optional)
         
