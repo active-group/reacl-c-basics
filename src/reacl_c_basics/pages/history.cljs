@@ -15,3 +15,28 @@
 
 (def html5-history r-history/html5-history)
 
+(defrecord ^:private ControlledHistory [base inactive?]
+  r-history/History
+  (start! [this nav-path! path-exists?]
+    (when-not inactive?
+      (r-history/start! base nav-path!
+                        path-exists?)))
+  (get-current [this]
+    (r-history/get-current base))
+  (push! [this path]
+    (when-not inactive?
+      (r-history/push! base path)))
+  (stop! [this]
+    (when-not inactive?
+      (r-history/stop! base))))
+
+(defn controlled-history
+  "A modified history, that can be turned off with a boolean flag."
+  [base inactive?]
+  (assert (satisfies? r-history/History base))
+  (ControlledHistory. base inactive?))
+
+(defn controlled-html5-history
+  "Like [[controlled-history]] with a HTML5 historory is the base."
+  [inactive?]
+  (controlled-history (r-history/html5-history) inactive?))

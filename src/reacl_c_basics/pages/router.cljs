@@ -23,7 +23,15 @@
   [path]
   (Goto. path))
 
-(defn- show-page [pages uri]
+(let [g (fn [f state a]
+          (if (instance? Goto a)
+            (f state (:uri a))
+            (c/return :action a)))]
+  (defn handle-goto [item f]
+    (-> item
+        (c/handle-action (f/partial g f)))))
+
+(defn- dispatch [pages uri]
   (when uri
     (if-let [[page args] (get-parsed pages uri)]
       (apply page args)
@@ -31,11 +39,9 @@
           nil))))
 
 (let [set-uri (fn [state uri] uri)
-      handle-goto (fn [history state a]
-                    (condp instance? a
-                      Goto (c/return :action (history/push! history (:uri a))
-                                     :state (assoc state 1 (:uri a)))
-                      (c/return :action a)))]
+      do-goto (fn [history state uri]
+                (c/return :action (history/push! history uri)
+                          :state (assoc state 1 uri)))]
   (c/defn-item history-router
     "Returns an item class that dispatches rendering based on the
   given map of routes to pages, where the current route and route
@@ -47,6 +53,6 @@
        (c/focus lens/second
                 (-> (history/listen history (f/partial page-exists-fn? pages))
                     (c/handle-action set-uri)))
-       (-> (c/focus lens/first (show-page pages uri))
-           (c/handle-action (f/partial handle-goto history)))))))
+       (-> (c/focus lens/first (dispatch pages uri))
+           (handle-goto (f/partial do-goto history)))))))
 
