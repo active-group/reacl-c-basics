@@ -22,7 +22,7 @@
      (let [input (dt/get env (dt/by-display-value "test"))]
        (dt/set-state! env "")
        (.reportValidity input) ;; can be an input
-       (is (some? (dt/find env (dt/by-text "Msg: Must not be empty"))))))))
+       (is (some? (dt/query env (dt/by-text "Msg: Must not be empty"))))))))
 
 (deftest with-validity-test-2
   (dt/rendering
@@ -37,15 +37,16 @@
    (fn [env]
      (let [form (dt/get env (dt/by-test-id "foo"))]
        (.reportValidity form) ;; can be a form
-       (is (some? (dt/find env (dt/by-text "Msg: Must not be empty"))))))))
+       (is (some? (dt/query env (dt/by-text "Msg: Must not be empty"))))))))
 
 (deftest append-validity-test
   (dt/rendering
    (fval/append-validity (non-empty-input {:data-testid "foo"})
                          (fn [msg]
+                           (js/console.log "Message:" msg)
                            (when msg (dom/div (str "Msg: " msg)))))
    :state ""
    (fn [env]
      (let [input (dt/get env (dt/by-test-id "foo"))]
        (.reportValidity input)
-       (is (some? (dt/find env (dt/by-text "Msg: Must not be empty"))))))))
+       (is (some? (dt/query env (dt/by-text "Msg: Must not be empty"))))))))
