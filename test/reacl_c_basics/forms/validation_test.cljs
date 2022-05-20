@@ -43,7 +43,6 @@
   (dt/rendering
    (fval/append-validity (non-empty-input {:data-testid "foo"})
                          (fn [msg]
-                           (js/console.log "Message:" msg)
                            (when msg (dom/div (str "Msg: " msg)))))
    :state ""
    (fn [env]
