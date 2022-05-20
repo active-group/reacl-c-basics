@@ -22,6 +22,11 @@
   [type attrs]
   (core/add-type-attributes type attrs))
 
+(defn update-type-base
+  "Calls f with the current base function and replaces it with the result."
+  [type f]
+  (update type core/type-base f))
+
 (defn native-type
   "Creates an input type for one of the native 'types' supported by a
   dom/input, i.e. \"text\", \"number\", \"checkbox\" etc. Note that
