@@ -140,7 +140,7 @@
 (defn ^:no-doc add-type-attributes [type attrs]
   (assert (type? type) (str "Not a type: " (pr-str type)))
   (-> type
-      (update-in type-attributes dom/merge-attributes attrs)))
+      (update type-attributes dom/merge-attributes attrs)))
 
 (defn- option-value-default-placeholder [value]
   (cond
