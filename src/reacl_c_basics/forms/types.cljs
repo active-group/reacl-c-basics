@@ -36,6 +36,27 @@
   [type]
   (core/native-type type))
 
+(let [parse (fn [par s]
+              (if (empty? s)
+                nil
+                (par s)))
+      unparse (fn [unp v]
+                (if (nil? v)
+                  ""
+                  (unp v)))]
+  (defn- parsed-optional
+    [type]
+    (-> type
+        (update core/type-attributes
+                (fn [attrs]
+                  (-> attrs
+                      (update :parse
+                              (fn [p]
+                                (f/partial parse p)))
+                      (update :unparse
+                              (fn [u]
+                                (f/partial unparse u)))))))))
+
 (defn parsed-type
   "Creates an input that requires parsing and unparsing of the string
   entered by the user. The function `parse` is called with the string
@@ -50,7 +71,7 @@
                                    :parse parse
                                    :unparse unparse}
                                   (core/type-attributes base-type))
-            core/string-optional))
+            parsed-optional))
 
 (defn- make-parsed [type]
   (if (some? (:parse (core/type-attributes type)))
@@ -93,8 +114,7 @@
 (def ^{:doc "An input type for a number."} number
   (parsed-type (native-type "number")
                (fn parse [s]
-                 ;; TODO: also distinguish between 'strict-number' and a more relaxed version?
-                 
+                 ;; Note: not called for 'optional parsed' and an empty.
                  ;; Note: "" parses as NaN although it's not isNaN; parseFloat ignores trailing extra chars; but isNaN does not:
                  (let [x (when (not (js/isNaN s))
                                (js/parseFloat s))]
