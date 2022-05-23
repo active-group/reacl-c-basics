@@ -1,6 +1,6 @@
 (ns reacl-c-basics.workspaces
   "A Nubank workspaces card type for reacl-c."
-  (:require #_[nubank.workspaces.model :as wsm]
+  (:require [nubank.workspaces.model :as wsm] ;; needed for keyword prefix alias ::wsm/
             [nubank.workspaces.card-types.util :as ct.util]
             [reacl-c.main :as reacl-c]
             [nubank.workspaces.ui.core :as uc]
