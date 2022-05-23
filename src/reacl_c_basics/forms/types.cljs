@@ -17,6 +17,8 @@
 (defn ^:no-doc new-type [base-fn default-attrs mk-optional]
   (core/new-type base-fn default-attrs mk-optional))
 
+;; TODO: some kind of (to-string type value)
+
 (defn add-attributes
   "Adds additional default attributes for the dom element used for the given type."
   [type attrs]
@@ -145,7 +147,7 @@
   attribute to define a sequence of `[value label]` tuples instead of
   using [[option]] items directly."
   [attrs]
-  (apply core/select (dissoc attrs :options)
+  (apply core/select (dissoc attrs :options :optional?)
          (when (:optional? attrs)
            (core/option {:value nil} ""))
          (map (fn [[value label]]
