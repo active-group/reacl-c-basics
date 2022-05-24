@@ -27,7 +27,7 @@
             [active.clojure.lens :as lens]
             [active.clojure.functions :as f]))
 
-(c/defn-effect ^:private report-validity! "Like [[check-validity!]],
+(c/defn-effect report-validity! "Like [[check-validity!]],
   but validation errors are also shown to the user. The browser will
   show them natively in a popup, or you can customize the visual
   presentation with [[with-validity]]. This will automatically be

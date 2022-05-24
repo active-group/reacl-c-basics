@@ -39,6 +39,17 @@
        (.reportValidity form) ;; can be a form
        (is (some? (dt/query env (dt/by-text "Msg: Must not be empty"))))))))
 
+(deftest report-validity-test
+  (dt/rendering
+   (fval/form-with-validity {:report-validity true}
+                            (fn [msg]
+                              (c/fragment
+                               (non-empty-input {})
+                               (when msg (dom/div (str "Msg: " msg))))))
+   :state ""
+   (fn [env]
+     (is (some? (dt/query env (dt/by-text "Msg: Must not be empty")))))))
+
 (deftest append-validity-test
   (dt/rendering
    (fval/append-validity (non-empty-input {:data-testid "foo"})

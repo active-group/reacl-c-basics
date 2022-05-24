@@ -5,7 +5,9 @@
   
   Additionally, the new attributes `:invalid` and `:validate` are
   supported for all of them, allowing for a declarative way to
-  use [[setCustomValidity]] on the dom nodes."
+  use [[setCustomValidity]] on the dom nodes. An attribute
+  `:report-validity` can be set to true on input items and [[form]] to
+  call `reportValidity` on them on every state change."
   (:require [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom :include-macros true]
             [active.clojure.lens :as lens]
@@ -24,16 +26,32 @@
     (f ref)
     (c/with-ref f)))
 
-(defn- with-invalid-attr [f attrs & content]
-  ;; Note: when :invalid was set before, it must be set to "" (not nil) to remove that state.
-  (if-let [msg (:invalid attrs)]
-    (maybe-with-ref (:ref attrs)
-                    (fn [r]
-                      (c/fragment (apply f (-> attrs
-                                               (assoc :ref r)
-                                               (dissoc attrs :invalid)) content)
-                                  (c/init (c/return :action (set-custom-validity! r (:invalid attrs)))))))
-    (apply f attrs content)))
+(c/defn-effect ^:private report-validity*!
+  [ref v]
+  (let [elem (c/deref ref)]
+    (.reportValidity elem)))
+
+(let [f (fn [ref state]
+          ;; pass state, so that is executed again when the state changes.
+          (c/init (c/return :action (report-validity*! ref state))))]
+  (defn- do-report-validity [ref]
+    (c/dynamic (f/partial f ref))))
+
+(let [g (fn [f attrs content r]
+          (c/fragment (apply f (-> attrs
+                                   (assoc :ref r)
+                                   (dissoc attrs :invalid :report-validity))
+                             content)
+                      (when (:invalid attrs)
+                        (c/init (c/return :action (set-custom-validity! r (:invalid attrs)))))
+                      (when (:report-validity attrs)
+                        (do-report-validity r))))]
+  (defn- with-invalid-attr [f attrs & content]
+    ;; Note: when :invalid was set before, it must be set to "" (not nil) to remove that state.
+    (if (or (:invalid attrs) (:report-validity attrs))
+      (maybe-with-ref (:ref attrs)
+                      (f/partial g f attrs content))
+      (apply f attrs content))))
 
 (defn- input-base [f attrs]
   (with-invalid-attr f attrs))
@@ -229,9 +247,9 @@
   (value-base dom/textarea attrs))
 
 (dom/defn-dom form
-  "The same as [[reacl-c.dom/form]]."
+  "The same as [[reacl-c.dom/form]], but with the additional attribute `:report-validity`."
   [attrs & content]
-  (apply dom/form attrs content))
+  (apply with-invalid-attr dom/form attrs content))
 
 (defn- lift-type [t]
   (if (type? t)
