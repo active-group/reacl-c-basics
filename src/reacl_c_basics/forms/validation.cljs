@@ -1,5 +1,7 @@
 (ns reacl-c-basics.forms.validation
-  "Utilities for a more customized display of form validity.
+  "EXPERIMENTAL
+
+  Utilities for a more customized display of form validity.
 
   Note: the basic validity of input fields can be defined with the
   `:invalid` and `:validate` attribtues
@@ -26,6 +28,8 @@
             [reacl-c-basics.forms.core :as forms]
             [active.clojure.lens :as lens]
             [active.clojure.functions :as f]))
+
+;; Note: this is still not 'perfect', esp. for the way to hide validation messages again; when to do that in general?
 
 (c/defn-effect report-validity! "Like [[check-validity!]],
   but validation errors are also shown to the user. The browser will
@@ -56,22 +60,32 @@
       oninvalid (fn [state ev]
                   (.preventDefault ev) ;; do not show native validity popup of browser
                   (c/return :action [::msg (get-msg (.-target ev))]))
+      handle-reset (fn [state a]
+                     (if (= ::reset a)
+                       (c/return :state [(first state) nil])
+                       (c/return :action a)))
       dyn (fn [[_ validation-message] f]
-            (c/focus lens/first
-                     (f validation-message
-                        oninvalid)))
+            (-> (c/focus lens/first
+                         ;; apparently, there is no even when an input becomes valid again :-/
+                         ;; offer the user a ::reset action for that.
+                         (f {:onInvalid oninvalid}
+                            validation-message
+                            ::reset))
+                (c/handle-action handle-reset)))
       set-msg (fn [[state _] a]
                 (if (and (vector? a) (= ::msg (first a)))
                   (c/return :state [state (second a)])
                   (c/return :action a)))]
   (defn with-validity
-    "An item that will call `(f validation-msg on-invalid), where
-  `on-invalid` is an event handler that must be used for the
-  `:onInvalid` event in a form, input element or anything that
-  contains input elements. `validation-msg` will then be non-nil when
-  form validation fails and the problem should be described to the
-  user. This turns off the default behaviour of the browser to show
-  these messages."
+    "An item that will call `(f attrs validation-msg reset-action), where
+  attrs contains and `:onInvalid` event handlers that must be used in
+  a in a form, input element or anything that contains input
+  elements. `validation-msg` will then be non-nil when form validation
+  fails and the problem should be described to the user. You can emit
+  'reset-action' to reset the validation message to nil.
+
+  This turns off the default behaviour of the browser to show these
+  messages."
     [f]
     ;; Note: message only 'appears' after form submit (or reportValidity); no initialization.
     (c/local-state
@@ -79,15 +93,15 @@
      (-> (c/dynamic dyn f)
          (c/handle-action set-msg)))))
 
-(let [g (fn [item-f attrs f msg event]
-          (item-f (assoc attrs :onInvalid event)
-                  (f msg)))]
+(let [g (fn [item-f attrs1 f attrs2 msg reset-action]
+          (item-f (dom/merge-attributes attrs2 attrs1)
+                  (f msg reset-action)))]
   (defn- item-with-validity
     [item-f attrs f]
     (with-validity (f/partial g item-f attrs f))))
 
 (defn form-with-validity
-  "A form item with contents `(f validation-msg)`, where
+  "A form item with contents `(f validation-msg reset-action)`, where
   `validation-msg` is nil or the description of validation errors that
   prevent the forms from being submitted."
   ([f]
@@ -96,9 +110,9 @@
    (item-with-validity forms/form attrs f)))
 
 (defn div-with-validity
-  "A div item with contents `(f validation-msg)`, where `validation-msg`
-  is nil or the description of validation errors in one of the
-  contained input elements."
+  "A div item with contents `(f validation-msg reset-action)`, where
+  `validation-msg` is nil or the description of validation errors in
+  one of the contained input elements."
   ([f]
    (div-with-validity {} f))
   ([attrs f]
@@ -108,7 +122,7 @@
           (c/fragment item (f msg)))]
   (defn append-validity
     "A div item with the given child item (which should usually be an
-  input element), followed by `(f validation-msg)` where
+  input element), followed by `(f validation-msg reset-action)` where
   `validation-msg` is any validation error in that input element."
     ([item f]
      (append-validity {} item f))
@@ -119,8 +133,9 @@
           (c/fragment (f msg) item))]
   (defn prepend-validity
     "A div item with the given child item (which should usually be an
-  input element), prepended with `(f validation-msg)` where
-  `validation-msg` is any validation error in that input element."
+  input element), prepended with `(f validation-msg reset-action)`
+  where `validation-msg` is any validation error in that input
+  element."
     ([f item]
      (prepend-validity {} f item))
     ([attrs f item]

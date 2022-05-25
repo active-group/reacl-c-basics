@@ -12,9 +12,9 @@
 (deftest with-validity-test-1
   (dt/rendering
    (fval/with-validity
-     (fn [msg oninvalid]
-       ;; Note: can put attrs in a div.
-       (dom/div {:onInvalid oninvalid}
+     (fn [attrs msg]
+       ;; Note: attrs can put attrs in a div.
+       (dom/div attrs
                 (non-empty-input)
                 (when msg (dom/div (str "Msg: " msg))))))
    :state "test"
@@ -27,11 +27,11 @@
 (deftest with-validity-test-2
   (dt/rendering
    (fval/with-validity
-     (fn [msg oninvalid]
-       ;; Note: can put attrs in an input directly.
+     (fn [attrs msg]
+       ;; Note: attrs can put attrs in an input directly.
        (c/with-state-as state
          (dom/form {:data-testid "foo"}
-                   (non-empty-input {:onInvalid oninvalid})
+                   (non-empty-input attrs)
                    (when msg (dom/div (str "Msg: " msg)))))))
    :state ""
    (fn [env]
@@ -42,13 +42,20 @@
 (deftest report-validity-test
   (dt/rendering
    (fval/form-with-validity {:report-validity true}
-                            (fn [msg]
+                            (fn [msg reset-action]
                               (c/fragment
                                (non-empty-input {})
+                               (c/with-state-as txt
+                                 (when-not (empty? txt)
+                                   (c/init (c/return :action reset-action))))
                                (when msg (dom/div (str "Msg: " msg))))))
    :state ""
    (fn [env]
-     (is (some? (dt/query env (dt/by-text "Msg: Must not be empty")))))))
+     (is (some? (dt/query env (dt/by-text "Msg: Must not be empty"))))
+
+     (dt/set-state! env "foo")
+     (is (nil? (dt/query env (dt/by-text "Msg: Must not be empty"))))
+     )))
 
 (deftest append-validity-test
   (dt/rendering
