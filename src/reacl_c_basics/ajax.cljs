@@ -271,6 +271,6 @@
     (c/local-state []
                    (c/fragment
                     (c/focus lens/second (c/dynamic (f/partial manage-queue manage)))
-                    (c/dynamic (f/partial run-jobs transition))
+                    (c/dynamic (f/partial run-jobs (or transition (f/constantly (c/return)))))
                     (c/handle-action (c/focus lens/first item)
                                      (f/partial add-jobs (or transition (f/constantly (c/return)))))))))
