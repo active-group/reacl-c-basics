@@ -7,7 +7,6 @@
   (:require [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom :include-macros true]
             [active.clojure.functions :as f]
-            [active.clojure.lens :as lens]
             [reacl-c-basics.forms.core :as core]
             [reacl-c-basics.forms.parsed :as parsed]
             [clojure.string :as str])
@@ -112,16 +111,18 @@
       call)))
 
 (def ^{:doc "An input type for a number."} number
-  (parsed-type (native-type "number")
-               (fn parse [s]
-                 ;; Note: not called for 'optional parsed' and an empty.
-                 ;; Note: "" parses as NaN although it's not isNaN; parseFloat ignores trailing extra chars; but isNaN does not:
-                 (let [x (when (not (js/isNaN s))
+  (-> (parsed-type (native-type "number")
+                   (fn parse [s]
+                     ;; Note: not called for 'optional parsed' and an empty.
+                     ;; Note: "" parses as NaN although it's not isNaN; parseFloat ignores trailing extra chars; but isNaN does not:
+                     (let [x (when (not (js/isNaN s))
                                (js/parseFloat s))]
-                   (if (or (nil? x) (js/isNaN x))
-                     (throw (parsed/parse-error "Not a number." s))
-                     x)))
-               str))
+                       (if (or (nil? x) (js/isNaN x))
+                         (throw (parsed/parse-error "Not a number." s))
+                         x)))
+                   str)
+      (add-attributes {:step "any"})))
+
 (def ^{:doc "An input type for an optional number."} opt-number (optional number))
 
 (def strict-integer
@@ -129,13 +130,15 @@
       (restrict-type (fn [v]
                        (if (integer? v)
                          v
-                         (throw (parsed/parse-error "Not an integer." v)))))))
+                         (throw (parsed/parse-error "Not an integer." v)))))
+      (add-attributes {:step "1"})))
 (def opt-strict-integer (optional strict-integer))
 
 (def ^{:doc "An input type for a integer number."}
   integer
   (-> number
-      (restrict-type long)))
+      (restrict-type long)
+      (add-attributes {:step "1"})))
 
 (def ^{:doc "An input type for an optional integer number."}
   opt-integer (optional integer))
