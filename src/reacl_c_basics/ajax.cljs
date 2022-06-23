@@ -213,12 +213,12 @@
                           [ret state] (ret-state (f state job) state)]
                       (c/merge-returned (c/return :state [state nil]) ;; nil to remove it from queue
                                         ret)))]
-  (c/defn-item job-executor [f]
+  (c/defn-item ^:private job-executor [execute-fn f]
     (c/with-state-as [st job]
       (case (delivery-job-status job)
         :pending (c/once (f/partial ->running f))
-        :running (fetch-once (delivery-job-request job)
-                             (f/partial ->completed f))
+        :running (-> (execute-fn (delivery-job-request job))
+                     (c/handle-action (f/partial ->completed f)))
         :completed c/empty))))
 
 (let [->pending (fn [f [state queue] job]
@@ -244,17 +244,25 @@
                                     job
                                     j))
                                 queue)))]))
-      run-jobs (fn [f [st0 queue]]
+      run-jobs (fn [execute-fn f [st0 queue]]
                  (apply c/fragment
                         (map (fn [id]
                                (-> (c/focus (f/partial job-lens id)
-                                            (job-executor f))
+                                            (job-executor execute-fn f))
                                    (c/keyed (str id))))
                              (map delivery-job-id queue))))
       manage-queue (fn [manage queue]
                      (if manage
                        (c/init (manage queue))
-                       c/empty))]
+                       c/empty))
+      options-map? (fn [options]
+                     (or (nil? options)
+                         (and (map? options)
+                              ;; active.clojure.functions are maps too :-/
+                              (or (empty? options)
+                                  (contains? options :transition)
+                                  (contains? options :manage)
+                                  (contains? options :execute)))))]
   (defn delivery
     "Returns an item that manages execution of Ajax requests in its
   local state. Use [[deliver]] to get an action that can be emitted by
@@ -266,11 +274,27 @@
 
   Some control over the queue can be achieved by specifying `manage`
   which is called on the queue after it changed and must return an
-  updated queue. Newest items are at the end of the queue."
-    [item & [transition manage]]
-    (c/local-state []
-                   (c/fragment
-                    (c/focus lens/second (c/dynamic (f/partial manage-queue manage)))
-                    (c/dynamic (f/partial run-jobs transition))
-                    (c/handle-action (c/focus lens/first item)
-                                     (f/partial add-jobs (or transition (f/constantly (c/return)))))))))
+  updated queue. Newest items are at the end of the queue.
+
+  The item function to actually execute the requests can also be
+  explicitly set; it defaults to [[execute]].
+  "
+    ([item]
+     (delivery item {}))
+    ([item options]
+     ;; backwards compat: options actually looks like a transition function:
+     (if (not (options-map? options))
+       (delivery item options nil)
+       (let [transition (or (:transition options) (f/constantly (c/return)))
+             manage (or (:manage options) nil)
+             execute (or (:execute options) execute)]
+         (c/local-state []
+                        (c/fragment
+                         (c/focus lens/second (c/dynamic (f/partial manage-queue manage)))
+                         (c/dynamic (f/partial run-jobs execute transition))
+                         (c/handle-action (c/focus lens/first item)
+                                          (f/partial add-jobs transition)))))))
+    ([item transition manage]
+     ;; deperecated; use options map
+     (delivery item {:transition transition
+                     :manage manage}))))
