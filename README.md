@@ -1,4 +1,4 @@
-# Reacl-c
+# Reacl-c-basics
 
 This is a collection of utilities often useful when developing with
 the [Reacl-C](https://github.com/active-group/reacl-c) web programming
