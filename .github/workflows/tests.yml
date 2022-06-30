@@ -1,0 +1,22 @@
+name: Tests
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install dependencies
+      run: |
+        lein deps
+        npm install
+    - name: Run ClojureScript tests 
+      run: |
+        lein build-test
+        npx karma start --single-run
+#    - name: Run Clojure tests
+#      run: |
+#        lein test
