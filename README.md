@@ -76,7 +76,17 @@ namely `multiline-string` and `enum` or `string-enum` respectively.
 
 ### Ajax requests
 
-TODO
+The namespace `reacl-c-basics.ajax` gives you mostly invisible items
+that perform an Ajax request and give you easy access to the results.
+
+You define requests usually with `GET`, `POST`, and maybe
+`map-ok-response`. Then you can execute them with the `fetch` item
+which changes its state to a response value when the server has
+responded. Or you use the `delivery` item and the `deliver` action to
+execute requests as a reaction to certain events.
+
+All items cancel outstanding requests when they are removed from the
+dom tree.
 
 ### Client side routing
 
