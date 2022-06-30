@@ -55,15 +55,20 @@ Note: `reacl-c-basics.forms` is deprecated.
 
 #### Advanced and custom input types
 
-The namespace `reacl-c-basics.forms.types` contains values - called
-*types* - that can be used for the `:type` attribute of the `input`
-items of `reacl-c-basics.forms.core`. It also contains functions to
-create new types.
+The namespace `reacl-c-basics.forms.types` contains additional
+values - called *types* - that can be used for the `:type` attribute
+of the `input` items of `reacl-c-basics.forms.core`. It also contains
+functions to create new types.
 
 The most used types are: `opt-integer`, which changes the state of the
 input item to either `nil` or an integer number, and `opt-fixnum`,
 which changes enables the user to enter a floating point number, but
-only with a fixed number of decimals.
+only with a fixed number of decimals. 
+
+The function `native-type` takes a string and gives you a type that
+results in the same kind of input that you get when you use that
+string as the type directly, e.g. `string` is the same as `(native-type
+"text")`.
 
 Some of the type values, will actually change the
 `reacl-c-basics.forms.core/input` item into a textbox or select item,
