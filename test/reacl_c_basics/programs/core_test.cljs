@@ -266,6 +266,9 @@
                                                              :state true))
                                      (f/constantly (c/return :action uninst))))))))
 
+;; catching and testing for error doesn't work properly in karma/compiled mode of shadow
+(def karma? (not= (aget js/window "__karma__") js/undefined))
+
 (defn throw-once []
   (silenced-unhandled-errors
    (c/local-state true
@@ -327,51 +330,54 @@
                                          string?)))))))
 
 (at/deftest test-tail-recursiveness-test
-  (let [size-of (fn [N]
-                  (run-async (with-size-of-component-structure
-                               (fn [k]
-                                 (apply p/sequ (concat (repeat N (p/return 0))
-                                                       [(p/then (p/return nil) k)]))))
+  (when-not karma?
+    (let [size-of (fn [N]
+                    (run-async (with-size-of-component-structure
+                                 (fn [k]
+                                   (apply p/sequ (concat (repeat N (p/return 0))
+                                                         [(p/then (p/return nil) k)]))))
                              
-                             nil :init 1000))]
-    (a/async
-     ;; to check the above technique seems to be working:
-     (is (not= 0 (a/await (size-of 1))))
-     (is (= (a/await (size-of 2)) (a/await (size-of 2)))))))
+                               nil :init 1000))]
+      (a/async
+       ;; to check the above technique seems to be working:
+       (is (not= 0 (a/await (size-of 1))))
+       (is (= (a/await (size-of 2)) (a/await (size-of 2))))))))
 
 (at/deftest sequ-tail-recursiveness
-  (let [size-of (fn [N]
-                  (run-async (with-size-of-component-structure
-                               (fn [k]
-                                 (apply p/sequ (concat (repeat N (p/return 0))
-                                                       [(p/then (p/return nil) k)]))))
+  (when-not karma?
+    (let [size-of (fn [N]
+                    (run-async (with-size-of-component-structure
+                                 (fn [k]
+                                   (apply p/sequ (concat (repeat N (p/return 0))
+                                                         [(p/then (p/return nil) k)]))))
                              
-                             nil :init 1000))]
-    #_(preventing-error-log-async
-     (fn []
-       ))
-    (a/async
-     (is (not (< (a/await (size-of 2))
-                 (a/await (size-of 4))
-                 (a/await (size-of 8))
-                 (a/await (size-of 16))))))
-    ))
+                               nil :init 1000))]
+      #_(preventing-error-log-async
+         (fn []
+           ))
+      (a/async
+       (is (not (< (a/await (size-of 2))
+                   (a/await (size-of 4))
+                   (a/await (size-of 8))
+                   (a/await (size-of 16))))))
+      )))
 
 (at/deftest trampoline-tail-recursiveness
-  (let [p (fn p [n]
-            (if (> n 0)
-              (p/then (p/return nil) (fn [_] (p/return (p (dec n)))))
-              (p/return nil)))
-        size-of (fn [N]
-                  (run-async (with-size-of-component-structure
-                               (fn [k]
-                                 (p/trampoline
-                                  (p/return (p N)))))
+  (when-not karma?
+    (let [p (fn p [n]
+              (if (> n 0)
+                (p/then (p/return nil) (fn [_] (p/return (p (dec n)))))
+                (p/return nil)))
+          size-of (fn [N]
+                    (run-async (with-size-of-component-structure
+                                 (fn [k]
+                                   (p/trampoline
+                                    (p/return (p N)))))
                              
-                             nil :init 1000))]
-    (a/async
-     (is (not (< (a/await (size-of 2))
-                 (a/await (size-of 4))
-                 (a/await (size-of 8))
-                 (a/await (size-of 16))))))
-    ))
+                               nil :init 1000))]
+      (a/async
+       (is (not (< (a/await (size-of 2))
+                   (a/await (size-of 4))
+                   (a/await (size-of 8))
+                   (a/await (size-of 16))))))
+      )))

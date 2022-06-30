@@ -77,6 +77,7 @@
 (deftest select-string-test
   (testing "can take many args"
     (dt/rendering (apply forms/select-string {} (repeat 50 (forms/option {:value 42} "42")))
+                  :state "42"
                   (fn [env]
                     (is true) ;; ok if it does not fail
                     ))))
