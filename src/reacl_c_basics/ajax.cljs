@@ -202,24 +202,29 @@
         [(lens/shove ret c/returned-state c/keep-state) st]))))
 
 (let [->running (fn [f [state job]]
-                  (let [job (lens/shove job delivery-job-status :running)
-                        [ret state] (ret-state (f state job) state)]
-                    (c/merge-returned (c/return :state [state job])
-                                      ret)))
-      ->completed (fn [f [state job] resp]
-                    (let [job (-> job
-                                  (lens/shove delivery-job-status :completed)
-                                  (lens/shove delivery-job-response resp))
+                  (if (some? job)
+                    (let [job (lens/shove job delivery-job-status :running)
                           [ret state] (ret-state (f state job) state)]
-                      (c/merge-returned (c/return :state [state nil]) ;; nil to remove it from queue
-                                        ret)))]
+                      (c/merge-returned (c/return :state [state job])
+                                        ret))
+                    (c/return)))
+      ->completed (fn [f [state job] resp]
+                    (if (some? job)
+                      (let [job (-> job
+                                    (lens/shove delivery-job-status :completed)
+                                    (lens/shove delivery-job-response resp))
+                            [ret state] (ret-state (f state job) state)]
+                        (c/merge-returned (c/return :state [state nil]) ;; nil to remove it from queue
+                                          ret))
+                      (c/return)))]
   (c/defn-item ^:private job-executor [execute-fn f]
     (c/with-state-as [st job]
-      (case (delivery-job-status job)
-        :pending (c/once (f/partial ->running f))
-        :running (-> (execute-fn (delivery-job-request job))
-                     (c/handle-action (f/partial ->completed f)))
-        :completed c/empty))))
+      (when (some? job) ;; may happen when 'manage' removed jobs.
+        (case (delivery-job-status job)
+          :pending (c/once (f/partial ->running f))
+          :running (-> (execute-fn (delivery-job-request job))
+                       (c/handle-action (f/partial ->completed f)))
+          :completed c/empty)))))
 
 (let [->pending (fn [f [state queue] job]
                   ;; run :pending
@@ -247,14 +252,13 @@
       run-jobs (fn [execute-fn f [st0 queue]]
                  (apply c/fragment
                         (map (fn [id]
+                               ;; NOTE: when 'manage' is used, jobs may disapper; so job may become nil.
                                (-> (c/focus (f/partial job-lens id)
                                             (job-executor execute-fn f))
                                    (c/keyed (str id))))
                              (map delivery-job-id queue))))
       manage-queue (fn [manage queue]
-                     (if manage
-                       (c/init (manage queue))
-                       c/empty))
+                     (c/init (manage queue)))
       options-map? (fn [options]
                      (or (nil? options)
                          (and (map? options)
@@ -286,7 +290,7 @@
      (if (not (options-map? options))
        (delivery item options nil)
        (let [transition (or (:transition options) (f/constantly (c/return)))
-             manage (or (:manage options) nil)
+             manage (or (:manage options) identity)
              execute (or (:execute options) execute)]
          (c/local-state []
                         (c/fragment

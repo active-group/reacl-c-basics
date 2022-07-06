@@ -132,8 +132,6 @@
          (-> (let [req  (ajax/GET "http://invalid.invalid")
                    resp (ajax/ok-response :v)
                    result (atom nil)
-
-                   deliver! (atom nil)
                    states (atom [])]
                (testing "starts running a job and completes eventually"
                  (dt/rendering
@@ -163,3 +161,42 @@
                                             (resolve :done))
                                           1)))))))
              (.then (fn [_] (done))))))
+
+(deftest delivery-manage-test
+  (async done
+         (-> (let [req  (ajax/GET "http://invalid.invalid")
+                   resp (ajax/ok-response :v)
+                   completed (atom 0)
+                   last-queue (atom nil)]
+               (testing "start 3 jobs, but only one completes"
+                 (dt/rendering
+                  (-> (ajax/delivery (dom/button {:data-testid "btn"
+                                                  :onclick (fn [_ _]
+                                                             (c/return :action (ajax/deliver req)
+                                                                       :action (ajax/deliver req)
+                                                                       :action (ajax/deliver req)))})
+                                     (fn transition [state job]
+                                       (when (ajax/completed? job)
+                                         (swap! completed inc))
+                                       (c/return))
+                                     (fn manage [queue]
+                                       (let [q (if (empty? queue)
+                                                 queue
+                                                 [(last queue)])]
+                                         (reset! last-queue q)
+                                         q)))
+                      (tuc/map-subscriptions {(ajax/execute req) (async! resp)}))
+                  (fn [env]
+                    ;; deliver jobs
+                    (dt/fire-event (dt/get env (dt/by-test-id "btn")) :click)
+
+                    ;; getting completed state/response, asynchronously.
+                    (new js/Promise.
+                         (fn [resolve reject]
+                           (js/setTimeout (fn []
+                                            (is (= 1 @completed))
+                                            (is (empty? @last-queue))
+                                            (resolve))
+                                          1)))))))
+             (.then (fn [_] (done))))))
+
