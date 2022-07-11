@@ -1,4 +1,4 @@
-(defproject de.active-group/reacl-c-basics "0.10.6"
+(defproject de.active-group/reacl-c-basics "0.10.7"
   :description "Library with utilities often useful when writing web applications with Reacl-C."
   
   :url "http://github.com/active-group/reacl-c-basics"
@@ -10,6 +10,7 @@
                  [org.clojure/clojurescript "1.10.773" :scope "provided"]
                  [de.active-group/reacl-c "0.10.16"]
                  [de.active-group/reacl-basics "0.1.2"]
+                 [de.active-group/active-clojure "0.36.0"]
                  [cljs-ajax "0.7.5"]
                  [clj-commons/cljss "1.6.4" :scope "provided"]
                  [nubank/workspaces "1.1.2" :scope "provided"]]
