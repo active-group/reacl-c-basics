@@ -2,7 +2,6 @@
   (:require #?(:clj [cljss.core :as css])
             #?(:clj [cljss.builder :as builder])
             #?(:cljs [cljss.core :as css :include-macros true])
-            [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom]))
 
 #?(:clj (defmacro defstyled "Defines a css-styled variant of the given dom function, i.e. a function taking an optional attributes map as the first arguments. The [[reacl-c.dom]] functions suffice."
