@@ -4,7 +4,7 @@ This is a collection of utilities often useful when developing with
 the [Reacl-C](https://github.com/active-group/reacl-c) web programming
 library for ClojureScript
 
-[![Latest Version](https://img.shields.io/clojars/v/de.active-group/reacl-c.svg)](https://clojars.org/de.active-group/reacl-c-basics)
+[![Latest Version](https://img.shields.io/clojars/v/de.active-group/reacl-c-basics.svg)](https://clojars.org/de.active-group/reacl-c-basics)
 [![Tests Status](https://github.com/active-group/reacl-c-basics/workflows/Tests/badge.svg)](https://github.com/active-group/reacl-c-basics/actions)
 
 ## Documentation
