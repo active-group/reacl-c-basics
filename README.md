@@ -90,8 +90,24 @@ dom tree.
 
 ### Client side routing
 
-TODO
+For an easy setup of HTML5 Client Side Routing, look at the namespaces
+starting with `reacl-c-basics.pages`.
 
-### Timeouts and animation frames
+As a short intro, write
 
-TODO
+- a `cljc` file that defines the routes of your app with
+  `reacl-c-basics.pages.routes`
+
+- a router that shows different content depending on the current
+  location using `reacl-c-basics.pages.router`
+
+- a ring handler that serves the client for all your routes with
+  `reacl-c-basics.pages.ring`
+
+### Timers and animation frames
+
+The core namespace of the library `reacl-c-basics.core` contains
+useful subscriptions to a JavaScript timer (`timeout` and `interval`),
+and to animation frame timestamps (`animation-frame` and
+`animation-frames`).
+
