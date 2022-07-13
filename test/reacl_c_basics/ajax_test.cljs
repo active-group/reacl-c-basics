@@ -67,7 +67,7 @@
                             (reset! response r)
                             (c/return)))
          ;; TODO: should there be a helper fn to do the conversion?
-         (tuc/map-subscriptions {(ajax/execute request) (sync! ((get-in request [:options :convert-response]) resp1))}))
+         (tuc/map-subscriptions {(ajax/execute request) (sync! ((get (ajax/request-options request) :convert-response) resp1))}))
      (fn [env]
        (is (= @response resp2))))))
 
