@@ -1,10 +1,14 @@
 (ns reacl-c-basics.cljss
+  "This namespace contains some convenience functions an macros based
+  on [cljss](https://github.com/clj-commons/cljss)."
   (:require #?(:clj [cljss.core :as css])
             #?(:clj [cljss.builder :as builder])
             #?(:cljs [cljss.core :as css :include-macros true])
             [reacl-c.dom :as dom]))
 
-#?(:clj (defmacro defstyled "Defines a css-styled variant of the given dom function, i.e. a function taking an optional attributes map as the first arguments. The [[reacl-c.dom]] functions suffice."
+#?(:clj (defmacro defstyled "Defines a css-styled variant of the given dom function, i.e. a
+  function taking an optional attributes map as the first
+  arguments. The reacl-c.dom functions suffice this criteron."
           [name dom-f styles]
           (let [cls-name#       (css/var->cls-name name)
                 cmp-name#       (css/var->cmp-name name)
@@ -26,7 +30,7 @@
 
 #?(:clj
    (defmacro defstyles "Defines a function returning string with one or more class names for
-  the given css style. Same as [[cljss.core/defstyles]]." [name args styles]
+  the given css style. Same as `cljss.core/defstyles`." [name args styles]
      `(css/defstyles ~name ~args ~styles)))
 
 ;; defn-dom + style?

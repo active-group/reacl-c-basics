@@ -26,7 +26,7 @@
 
   If the function returns `nil`, the request is executed as
   normal. Note that this means you can pass in a map as `f`, mapping
-  requests to responsed."
+  requests to responses."
     [item f]
     ;; It used to be possible that f returns c/no-effect to turn request 'off'. But who want's that?
     (tu/map-subscriptions item (f/partial h f))))

@@ -36,7 +36,7 @@
         (js/window.cancelAnimationFrame v)))))
 
 (c/defn-subscription timeout
-  "Subscription to a timer, emitting `true` or `action` as an action once, after they given number of milliseconds."
+  "Subscription to a timer, emitting `true` or `action` as an action once, after the given number of milliseconds."
   deliver! [ms & [action]]
   (let [id (js/window.setTimeout (fn []
                                    (deliver! (when (some? action) action true)))
@@ -54,8 +54,9 @@
       (js/window.clearInterval id))))
 
 (c/defn-subscription intersection-change
-  "Returns a subscription item to intersection information for the
-  given dom element, as of the IntersectionObserver API."
+  "Returns a subscription to intersection information for the given
+  dom element as of the IntersectionObserver API. The options map may
+  contain the `:root`, `:root-margin` and `:threshold` keys."
   deliver! [elem options]
   ;; TODO: on a native dom elem?
   (let [obs (new js/IntersectionObserver
@@ -71,9 +72,9 @@
       (.disconnect obs))))
 
 (defn visibility-change
-  "Returns a subscription item that emits true or false, when the
-  given dom element becomes visible or invisible to the user in the
-  browser window."
+  "Returns a subscription that emits true or false, when the given dom
+  element becomes visible or invisible to the user in the browser
+  window."
   [elem & [options]]
   (-> (intersection-change elem
                            options)
