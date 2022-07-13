@@ -1,6 +1,6 @@
 (ns reacl-c-basics.debounce-test
   (:require [reacl-c-basics.debounce :as debounce]
-            [reacl-c.core :as c]
+            [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom]
             [active.clojure.functions :as f]
             [reacl-c.test-util.core :as tu :include-macros true]

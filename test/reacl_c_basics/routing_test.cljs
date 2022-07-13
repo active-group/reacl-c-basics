@@ -1,6 +1,6 @@
 (ns reacl-c-basics.routing-test
   (:require [reacl-c-basics.pages.core :as routing]
-            [reacl-c.core :as c]
+            [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom]
             [reacl-c.test-util.dom-testing :as dt]
             [reacl-c-basics.pages.routes :as routes :include-macros true]

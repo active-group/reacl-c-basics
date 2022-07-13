@@ -1,7 +1,7 @@
 (ns reacl-c-basics.programs.core-test
   (:require [reacl-c-basics.programs.core :as p :include-macros true]
-            [reacl-c.core :as c]
-            [reacl-c.dom :as dom]
+            [reacl-c.core :as c :include-macros true]
+            [reacl-c.dom :as dom :include-macros true]
             [reacl-c.test-util.dom-testing :as dt]
             [active.clojure.lens :as lens]
             [active.clojure.functions :as f]
