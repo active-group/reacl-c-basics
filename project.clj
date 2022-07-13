@@ -19,10 +19,10 @@
             [lein-auto "0.1.3"]]
 
   :profiles {:dev {:dependencies [[de.active-group/cljs-async "2.0.0"]]}
-             :shadow {:dependencies [[thheller/shadow-cljs "2.11.7"]
-                                     [binaryage/devtools "1.0.2"]]
-                      :source-paths ["src" "test" "examples"]
-                      :resource-paths ["target" "resources"]}
+             :shadow [:dev {:dependencies [[thheller/shadow-cljs "2.11.7"]
+                                           [binaryage/devtools "1.0.2"]]
+                            :source-paths ["src" "test" "examples"]
+                            :resource-paths ["target" "resources"]}]
              :codox {:dependencies [[codox-theme-rdash "0.1.2"]]}}
 
   :clean-targets ^{:protect false} [:target-path]
