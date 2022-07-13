@@ -307,7 +307,7 @@
     ;; TODO: local let bindings.
     (empty? forms)
     (cond
-      (vector? form) (second form)
+      (vector? form) (second form) ;; binding at end; FIXME: should be illegal, shouldn't it?
       :else form)
 
     :else
