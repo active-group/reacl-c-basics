@@ -1,4 +1,5 @@
-(ns reacl-c-basics.forms
+(ns ^:no-doc reacl-c-basics.forms
+  "This namespace is deprecated."
   (:require [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom :include-macros true]
             [active.clojure.functions :as f]
