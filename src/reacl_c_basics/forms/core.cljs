@@ -1,11 +1,12 @@
 (ns reacl-c-basics.forms.core
-  "The basic form elements (input, select, textbox) as items with
-  corresponding states. The [[select]] item also supports any kind
-  of values for the [[option]] `:value` attribute, not just strings.
+  "This namespace contains replacements for the basic form
+  elements (input, select, textbox) but with corresponding
+  states. The [[select]] item also supports any kind of values for
+  the `:value` attribute of [[option]]s, not just strings.
   
   Additionally, the new attributes `:invalid` and `:validate` are
   supported for all of them, allowing for a declarative way to
-  use [[setCustomValidity]] on the dom nodes. An attribute
+  use `setCustomValidity` on the dom nodes. An attribute
   `:report-validity` can be set to true on input items and [[form]] to
   call `reportValidity` on them on every state change."
   (:require [reacl-c.core :as c :include-macros true]
@@ -192,7 +193,7 @@
 (defrecord ^:private OptionValue [placeholder value])
 
 (dom/defn-dom option
-  "An item the can be used inside a [[select]] element to define a
+  "An item that can be used inside a [[select]] element to define a
   selectable option. The attribute `:value` can be any value, and the
   contents should be the text shown to the user."
   [attrs & contents]
@@ -227,7 +228,7 @@
                         (if (instance? OptionValue a)
                           (c/return :state [st (assoc ph-map (:value a) (:placeholder a))])
                           (c/return :action a)))]
-  (dom/defn-dom select "A select element that allows options to have
+  (dom/defn-dom select "A select element that allows [[option]]s to have
   arbitrary values. If the `:multiple` attribute is set, then the
   state of this item must be a list of values or nil."
     [attrs & options]
@@ -257,7 +258,16 @@
     (native-type t)))
 
 (dom/defn-dom input
-  "An item representing its state in an input element depending on the given `:type` attribute."
+  "An item representing its state as the value of an input element.
+
+   The `:type` attribute can influence the type of the state:
+   - for `\"checkbox\"` and `\"radio\"` the state must be a boolean
+   - for `\"file\"` it must be a `nil` or a `js/File` object
+   - for `\"submit\"` and `\"cancel\"` it is ignored
+   - for `nil` and all other strings, the state must be a string.
+
+  Note that the `:type` can also be one of the types defined in [[reacl-c-basics.forms.types]].
+"
   [attrs]
   (let [t (lift-type (:type attrs))]
     ((type-base t) (dom/merge-attributes (type-attributes t) (dissoc attrs :type)))))
