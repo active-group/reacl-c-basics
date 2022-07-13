@@ -35,7 +35,7 @@
                    (when msg (dom/div (str "Msg: " msg)))))))
    :state ""
    (fn [env]
-     (let [form (dt/get env (dt/by-test-id "foo"))]
+     (let [form (dt/get env (dt/by-testid "foo"))]
        (.reportValidity form) ;; can be a form
        (is (some? (dt/query env (dt/by-text "Msg: Must not be empty"))))))))
 
@@ -64,6 +64,6 @@
                            (when msg (dom/div (str "Msg: " msg)))))
    :state ""
    (fn [env]
-     (let [input (dt/get env (dt/by-test-id "foo"))]
+     (let [input (dt/get env (dt/by-testid "foo"))]
        (.reportValidity input)
        (is (some? (dt/query env (dt/by-text "Msg: Must not be empty"))))))))

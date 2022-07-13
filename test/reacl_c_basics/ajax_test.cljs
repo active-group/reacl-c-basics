@@ -149,7 +149,7 @@
                     (is (= [] @states))
 
                     ;; deliver a job
-                    (dt/fire-event (dt/get env (dt/by-test-id "btn")) :click)
+                    (dt/fire-event (dt/get env (dt/by-testid "btn")) :click)
                     (is (= [:pending :running] @states))
 
                     ;; getting completed state/response, asynchronously.
@@ -188,7 +188,7 @@
                       (tuc/map-subscriptions {(ajax/execute req) (async! resp)}))
                   (fn [env]
                     ;; deliver jobs
-                    (dt/fire-event (dt/get env (dt/by-test-id "btn")) :click)
+                    (dt/fire-event (dt/get env (dt/by-testid "btn")) :click)
 
                     ;; getting completed state/response, asynchronously.
                     (new js/Promise.

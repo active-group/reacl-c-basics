@@ -18,7 +18,7 @@
        (is (some? (dt/query env (dt/by-display-value "abc"))))
 
        ;; reset to default works
-       (dt/fire-event (dt/get env (dt/by-test-id "myform")) :reset)
+       (dt/fire-event (dt/get env (dt/by-testid "myform")) :reset)
        (is (some? (dt/query env (dt/by-display-value "def"))))
      
        ;; setting value
@@ -27,7 +27,7 @@
        (is (some? (dt/query env (dt/by-display-value "foobar"))))
 
        ;; submitting
-       (dt/fire-event (dt/get env (dt/by-test-id "myform")) :submit)
+       (dt/fire-event (dt/get env (dt/by-testid "myform")) :submit)
        (is (= @submitted {:text "foobar"}))
        ))))
 
@@ -37,7 +37,7 @@
                       (dom/button {:onclick (constantly 21)} "update"))
 
         current-input (fn [e]
-                        (dt/query e (dt/by-test-id "inp")))
+                        (dt/query e (dt/by-testid "inp")))
         current-text (fn [e]
                        (-> (current-input e)
                            (.-value)))
