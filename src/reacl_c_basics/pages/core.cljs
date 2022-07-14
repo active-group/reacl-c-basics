@@ -8,7 +8,7 @@
 ;; Note: use together with reacl-c-basics.pages.routes and reacl-c-basics.pages.ring
 
 (c/defn-item history-router
-  "Like `html5-history-router`, but with a custom History implementation."
+  "Like [[html5-history-router]], but with a custom History implementation."
   [history-impl pages]
   (router/history-router history-impl pages))
 

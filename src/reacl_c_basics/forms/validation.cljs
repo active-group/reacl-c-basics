@@ -77,11 +77,11 @@
                   (c/return :state [state (second a)])
                   (c/return :action a)))]
   (defn with-validity
-    "An item that will call `(f attrs validation-msg reset-action), where
-  attrs contains and `:onInvalid` event handlers that must be used in
-  a in a form, input element or anything that contains input
+    "An item that will call `(f attrs validation-msg reset-action)`, where
+  attrs contains and `:onInvalid` event handler that must be used in a
+  form, input element or anything that contains input
   elements. `validation-msg` will then be non-nil when form validation
-  fails and the problem should be described to the user. You can emit
+  fails and the problem should be displayed to the user. You can emit
   'reset-action' to reset the validation message to nil.
 
   This turns off the default behaviour of the browser to show these
