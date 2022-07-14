@@ -24,6 +24,9 @@
     {:onclick #(c/return :action (deliver (PUT \"/resource\" {:body v})))}))
   ```
 
+  Note that all items cancel outstanding requests when they are
+  removed from the dom tree.
+
   For details on the various options of the request constructors, see
   the documentation
   of [`cljs-ajax`](https://github.com/JulianBirch/cljs-ajax#getpostput).
