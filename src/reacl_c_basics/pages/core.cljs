@@ -1,4 +1,18 @@
 (ns reacl-c-basics.pages.core
+  "Utilities for client side routing, i.e. multiple pages in a so called
+  single page application.
+
+  The basic usage is to define routes and page functions, and the use
+  a router component near the toplevel of your application to show
+  different contents based on the current browser location URL:
+
+  ```
+  (routes/defroutes my-app
+    (routes/defroute home \"/\"))
+
+  (html5-history-router {home (constantly \"Hello World\")})
+  ```
+  "
   (:require [reacl-c.core :as c :include-macros true]
             [active.clojure.functions :as f]
             [reacl-c-basics.pages.routes :as routes]
@@ -7,10 +21,10 @@
 
 ;; Note: use together with reacl-c-basics.pages.routes and reacl-c-basics.pages.ring
 
-(c/defn-item history-router
+(c/defn-item ^:no-doc history-router
   "Like [[html5-history-router]], but with a custom History implementation."
-  [history-impl pages]
-  (router/history-router history-impl pages))
+  [history-impl pages-map]
+  (router/history-router history-impl pages-map))
 
 (c/defn-item html5-history-router
   "An item that renders to one of the pages from the given map of
@@ -18,8 +32,8 @@
   monitored for changes. It also handles [[goto]] actions emitted from
   within, modifying the browser history accordingly. A page must be a
   function taking the arguments of the route, returning an item."
-  [pages]
-  (history-router (history/html5-history) pages))
+  [pages-map]
+  (history-router (history/html5-history) pages-map))
 
 (let [do-goto (fn [_ uri]
                 (set! (.-href (.-location js/window)) uri)
@@ -29,9 +43,9 @@
   routes to pages, depending on the pathname and query of the current
   window location URI. Unlike [[html5-history-router]] this does not
   capture/monitor location changes, but it handles [[goto]] actions."
-    [pages]
-    (-> (router/dispatch pages (let [l (.-location js/window)]
-                                 (str (.-pathname l) (.-query l))))
+    [pages-map]
+    (-> (router/dispatch pages-map (let [l (.-location js/window)] ;; TODO: effect? initializer?
+                                     (str (.-pathname l) (.-query l))))
         (router/handle-goto do-goto))))
 
 (defn goto

@@ -1,4 +1,4 @@
-(ns reacl-c-basics.pages.history
+(ns ^:no-doc reacl-c-basics.pages.history
   (:require [accountant.core :as accountant]
             [cemerick.url :as url]
             [reacl-basics.pages.history :as r-history]

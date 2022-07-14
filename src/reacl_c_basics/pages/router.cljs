@@ -1,4 +1,5 @@
-(ns reacl-c-basics.pages.router
+(ns ^:no-doc reacl-c-basics.pages.router
+  ;; Note: use corresponding functions in 'pages.core'.
   (:require [reacl-c.core :as c :include-macros true]
             [active.clojure.lens :as lens]
             [active.clojure.functions :as f]
