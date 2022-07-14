@@ -55,6 +55,7 @@
   (defn- parsed-optional
     [type]
     (-> type
+        (assoc core/type-to-optional identity)
         (update core/type-attributes
                 (fn [attrs]
                   (-> attrs

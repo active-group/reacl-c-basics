@@ -136,6 +136,7 @@
   (defn ^:no-doc string-optional
     [type]
     (-> type
+        (assoc type-to-optional identity)
         (update type-base
                 (fn [f]
                   (f/comp g f))))))
