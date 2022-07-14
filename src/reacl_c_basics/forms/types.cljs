@@ -12,11 +12,15 @@
             [clojure.string :as str])
   (:refer-clojure :exclude [extend-type boolean]))
 
-;; TODO: document/make public, resp. more user-friendly.
-(defn ^:no-doc new-type [base-fn default-attrs mk-optional]
-  (core/new-type base-fn default-attrs mk-optional))
-
-;; TODO: some kind of (to-string type value)
+(defn new-type
+  "Creates a new input type, given a basic dom
+  function (e.g. core/input), a map of default attributes (e.g. a
+  string value for the `:type` attribute), and a function that takes
+  this type and returns a type that also accepts `nil` as a value. The
+  `to-optional` function may throw, if the type cannot be extended to
+  accept `nil`."
+  [base-fn default-attrs to-optional]
+  (core/new-type base-fn default-attrs to-optional))
 
 (defn add-attributes
   "Adds additional default attributes for the dom element used for the given type."
@@ -27,6 +31,11 @@
   "Calls f with the current base function and replaces it with the result."
   [type f]
   (update type core/type-base f))
+
+(defn update-to-optional
+  [type f]
+  "Calls f with the current `to-optional` function and replaces it with the result."
+  (update type core/type-to-optional f))
 
 (defn native-type
   "Creates an input type for one of the native 'types' supported by a
