@@ -3,7 +3,15 @@
   of [[reacl-c-basics.forms.core/input]] items, giving more control
   over the data types of the state value, and to some extend over the
   ui controls to enter those values. The type system defined here is
-  also extensible."
+  also extensible.
+
+  For example, you can ask the user for an integer via
+
+  ```
+  (c/isolate-state 0
+    (core/input {:type types/integer}))
+  ```
+  "
   (:require [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom :include-macros true]
             [active.clojure.functions :as f]
@@ -67,9 +75,10 @@
                                 (f/partial unparse u)))))))))
 
 (defn parsed-type
-  "Creates an input that requires parsing and unparsing of the string
-  entered by the user. See [[parsed/input-parsed]] for details on the
-  parse and unparse functions."
+  "Creates an input that requires parsing and unparsing of the native
+  value entered by the user (usually a
+  string). See [[parsed/input-parsed]] for details on the parse and
+  unparse functions."
   [base-type parse unparse]
   ;; Note: not sure how/if this works when base-type is not a native-type
   (assert (core/type? base-type) (str "Not a type: " (pr-str base-type)))
@@ -133,14 +142,16 @@
 
 (def ^{:doc "An input type for an optional number."} opt-number (optional number))
 
-(def strict-integer
+(def ^{:doc "An input type that requires the user to enter an integer
+number. For an input type that for example just removes decimal
+places, use [[integer]]."} strict-integer
   (-> number
       (restrict-type (fn [v]
                        (if (integer? v)
                          v
                          (throw (parsed/parse-error "Not an integer." v)))))
       (add-attributes {:step "1"})))
-(def opt-strict-integer (optional strict-integer))
+(def ^{:doc "An optional [[strict-integer]]."} opt-strict-integer (optional strict-integer))
 
 (def ^{:doc "An input type for a integer number."}
   integer
@@ -148,16 +159,18 @@
       (restrict-type long)
       (add-attributes {:step "1"})))
 
-(def ^{:doc "An input type for an optional integer number."}
+(def ^{:doc "An input type for an optional [[integer]]."}
   opt-integer (optional integer))
 
 (def ^{:doc "An input type for a string."}
   string (native-type "text"))
 
-(def ^{:doc "An input type for an optional string."}
+(def ^{:doc "An input type for an optional [[string]]."}
   opt-string (optional string))
 
-(def ^{:doc "An input type for an optional, but non-empty string."}
+(def ^{:doc "An input type for an optional, but non-empty string,
+  i.e. the value is never an empty string. This also trims the text
+  entered, so only whitespace becomed `nil` as well."}
   opt-non-empty-string
   (-> opt-string
       (restrict-type
@@ -167,7 +180,7 @@
              nil
              r))))))
 
-(def ^{:doc "An input for a boolean value, represented a checkbox."}
+(def ^{:doc "An input for a boolean value, represented as a checkbox."}
   boolean (native-type "checkbox"))
 
 (def ^{:doc "An input type for a string, represented in a multiline textbox element."}
@@ -187,12 +200,13 @@
 
 (defn- simple-select-optional [type]
   (-> type
+      (assoc core/type-to-optional identity)
       (update core/type-attributes
               assoc :optional? true)))
 
 (defn enum
-  "An input type for one of some arbitrary values. The argument
-  `values-labels` must consist of a sequence of tuples `[value text]`
+  "An input type for one of a set of arbitrary values. The argument
+  `values-labels` must be a a sequence of tuples `[value text]`
   specifying the value selected and a string that represents the value
   for the user."
   [values-labels]
