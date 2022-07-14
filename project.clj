@@ -8,7 +8,7 @@
 
   :dependencies [[org.clojure/clojure "1.10.1" :scope "provided"]
                  [org.clojure/clojurescript "1.10.773" :scope "provided"]
-                 [de.active-group/reacl-c "0.10.17"]
+                 [de.active-group/reacl-c "0.11.1"]
                  
                  [de.active-group/active-clojure "0.41.0"]
                  [venantius/accountant "0.2.5"]
@@ -21,7 +21,8 @@
   :plugins [[lein-codox "0.10.7"]
             [lein-auto "0.1.3"]]
 
-  :profiles {:dev {:dependencies [[de.active-group/cljs-async "2.0.0"]]}
+  :profiles {:dev {:dependencies [[de.active-group/cljs-async "2.0.0"]
+                                  [de.active-group/reacl-c-testing "0.1.0"]]}
              :shadow [:dev {:dependencies [[thheller/shadow-cljs "2.11.7"]
                                            [binaryage/devtools "1.0.2"]]
                             :source-paths ["src" "test" "examples"]
