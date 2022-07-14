@@ -3,19 +3,6 @@
   (:require [reacl-c.dom :as dom]
             [reacl-c.core :as c :include-macros true]))
 
-;; TODO: remove defn-dom
-
-(defn ^:no-doc split-dom-attrs [args]
-  (if (and (not-empty args)
-           (dom/dom-attributes? (first args)))
-    [(first args) (rest args)]
-    [{} args]))
-
-(defn ^:no-doc dom-like [f]
-  (fn [& args]
-    (let [[attrs children] (split-dom-attrs args)]
-      (apply f attrs children))))
-
 (c/defn-subscription animation-frame
   "Subscription to a single animation frame, emitting the timestamp as an action."
   deliver! []

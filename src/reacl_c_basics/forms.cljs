@@ -5,6 +5,12 @@
             [active.clojure.functions :as f]
             [reacl-c-basics.core :as core :include-macros true]))
 
+(defn- split-dom-attrs [args]
+  (if (and (not-empty args)
+           (dom/dom-attributes? (first args)))
+    [(first args) (rest args)]
+    [{} args]))
+
 (defn- checked-state [_ e]
   (.. e -target -checked))
 
