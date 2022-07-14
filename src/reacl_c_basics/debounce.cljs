@@ -1,4 +1,6 @@
 (ns reacl-c-basics.debounce
+  "Utility to delay state updates from items, which is sometimes useful
+  for input elements."
   (:require [reacl-c.core :as c :include-macros true]
             [reacl-c-basics.core :as core :include-macros true]
             [active.clojure.lens :as lens]

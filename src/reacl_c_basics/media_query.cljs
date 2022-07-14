@@ -1,4 +1,6 @@
 (ns reacl-c-basics.media-query
+  "Utilities to do CSS media queries and get notified when their results
+  change, e.g. the user resized the window."
   (:require [reacl-c.core :as c :include-macros true]
             [active.clojure.functions :as f]
             [active.clojure.lens :as lens]))

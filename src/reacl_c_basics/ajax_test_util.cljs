@@ -1,4 +1,5 @@
 (ns reacl-c-basics.ajax-test-util
+  "Utilities to help emulating server responses in unit tests."
   (:require [reacl-c.core :as c :include-macros true]
             [reacl-c-basics.ajax :as ajax]
             [active.clojure.functions :as f]

@@ -1,4 +1,5 @@
 (ns reacl-c-basics.core
+  "A collection of various small utilities."
   (:require [reacl-c.dom :as dom]
             [reacl-c.core :as c :include-macros true]))
 
