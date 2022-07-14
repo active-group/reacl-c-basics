@@ -2,7 +2,7 @@
   "Utility to delay state updates from items, which is sometimes useful
   for input elements."
   (:require [reacl-c.core :as c :include-macros true]
-            [reacl-c-basics.core :as core :include-macros true]
+            [reacl-c-basics.core :as core]
             [active.clojure.lens :as lens]
             [active.clojure.functions :as f]))
 

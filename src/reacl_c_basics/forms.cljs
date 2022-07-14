@@ -3,7 +3,7 @@
   (:require [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom :include-macros true]
             [active.clojure.functions :as f]
-            [reacl-c-basics.core :as core :include-macros true]))
+            [reacl-c-basics.core :as core]))
 
 (defn- split-dom-attrs [args]
   (if (and (not-empty args)
@@ -53,7 +53,7 @@
   ;; state = [value text] on the currently parsed value (or nil if not possible), and the actual text entered/shown.
   ;; (parse string) => value
   ;; (restrict prev-text next-text) => string, preventing some input while typing.
-  (let [[attrs content] (core/split-dom-attrs args)]
+  (let [[attrs content] (split-dom-attrs args)]
     (c/focus (f/partial input-parsed-lens* parse restrict)
              (apply input-string attrs content))))
 
@@ -86,7 +86,7 @@
   (defn ^:no-doc input-parsed [parse unparse restrict & args]
     ;; this keeps the text the user entered, iff and as long as the input has the focus, and changes it to (unparse value) otherwise.
     ;; Note: use input-parsed* if you need to distinguish between 'no input' and 'invalid input'.
-    (let [[attrs content] (core/split-dom-attrs args)]
+    (let [[attrs content] (split-dom-attrs args)]
       (c/local-state {:text ""
                       :focused? false}
                      (-> (c/focus (f/partial input-parsed-lens unparse)
