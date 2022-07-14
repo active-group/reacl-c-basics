@@ -1,14 +1,18 @@
 (ns reacl-c-basics.forms.core
   "This namespace contains replacements for the basic form
   elements (input, select, textbox) but with corresponding
-  states. The [[select]] item also supports any kind of values for
-  the `:value` attribute of [[option]]s, not just strings.
+  states.
+
+  The [[select]] item also supports any kind of values for the
+  `:value` attribute of [[option]]s, not just strings.
   
   Additionally, the new attributes `:invalid` and `:validate` are
   supported for all of them, allowing for a declarative way to
-  use `setCustomValidity` on the dom nodes. An attribute
-  `:report-validity` can be set to true on input items and [[form]] to
-  call `reportValidity` on them on every state change."
+  use `setCustomValidity` on the dom nodes.
+
+  An attribute `:report-validity` can be set to true on input items
+  and [[form]] to call `reportValidity` on them on every state
+  change."
   (:require [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom :include-macros true]
             [active.clojure.lens :as lens]
@@ -230,7 +234,9 @@
                           (c/return :action a)))]
   (dom/defn-dom select "A select element that allows [[option]]s to have
   arbitrary values. If the `:multiple` attribute is set, then the
-  state of this item must be a list of values or nil."
+  state of this item must be a list of values or nil.
+
+  Also supports the new attributes `:invalid` and `:validate`."
     [attrs & options]
     ;; Note: the [[option]] elements from this namespace report their value and placeholder via an action.
     (c/with-state-as [value ph-map :local {}]
@@ -243,12 +249,14 @@
           (c/handle-action add-placeholder)))))
 
 (dom/defn-dom textarea
-  "An item representing its string state in a textual multiline input element."
+  "An item representing its string state in a textual multiline input element.
+   
+   Also supports the new attributes `:invalid` and `:validate`."
   [attrs]
   (value-base dom/textarea attrs))
 
 (dom/defn-dom form
-  "The same as [[reacl-c.dom/form]], but with the additional attribute `:report-validity`."
+  "The same as `reacl-c.dom/form`, but with the additional attribute `:report-validity`."
   [attrs & content]
   (apply with-invalid-attr dom/form attrs content))
 
@@ -267,7 +275,8 @@
    - for `nil` and all other strings, the state must be a string.
 
   Note that the `:type` can also be one of the types defined in [[reacl-c-basics.forms.types]].
-"
+
+  Also supports the new attributes `:invalid` and `:validate`."
   [attrs]
   (let [t (lift-type (:type attrs))]
     ((type-base t) (dom/merge-attributes (type-attributes t) (dissoc attrs :type)))))
