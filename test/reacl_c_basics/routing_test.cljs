@@ -5,7 +5,7 @@
             [reacl-c.test-util.dom-testing :as dt]
             [reacl-c-basics.pages.routes :as routes :include-macros true]
             [reacl-c-basics.pages.history :as history]
-            [reacl-basics.pages.history :as rhistory]
+            [reacl-c-basics.pages.r-history :as rhistory]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
 
 (deftest history-router-test

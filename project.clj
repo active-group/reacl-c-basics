@@ -9,10 +9,13 @@
   :dependencies [[org.clojure/clojure "1.10.1" :scope "provided"]
                  [org.clojure/clojurescript "1.10.773" :scope "provided"]
                  [de.active-group/reacl-c "0.10.17"]
-                 [de.active-group/reacl-basics "0.1.2"]
+                 
                  [de.active-group/active-clojure "0.41.0"]
-                 [cljs-ajax "0.7.5"]
-                 [clj-commons/cljss "1.6.4" :scope "provided"]
+                 [venantius/accountant "0.2.5"]
+                 [clout "2.2.1"]
+                 [com.cemerick/url "0.1.1"]
+                 [cljs-ajax "0.8.4"]
+                 [clj-commons/cljss "1.6.4"]
                  [nubank/workspaces "1.1.2" :scope "provided"]]
 
   :plugins [[lein-codox "0.10.7"]
