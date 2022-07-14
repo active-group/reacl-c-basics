@@ -58,10 +58,8 @@
 
 (defn parsed-type
   "Creates an input that requires parsing and unparsing of the string
-  entered by the user. The function `parse` is called with the string
-  entered by the user, and must either return the parsed value of
-  throw [[parsed/parse-error]]. The function `unparse` must return a
-  string representing a parsed value."
+  entered by the user. See [[parsed/input-parsed]] for details on the
+  parse and unparse functions."
   [base-type parse unparse]
   ;; Note: not sure how/if this works when base-type is not a native-type
   (assert (core/type? base-type) (str "Not a type: " (pr-str base-type)))
@@ -199,8 +197,10 @@
 (let [parse (fn [decimals parse-num s]
               (js/parseFloat (.toFixed (parse-num s) decimals)))
       unparse (fn [decimals unparse-num v]
-                ;; Note: this might lead to not actually showing the real value to the user
-                (.toFixed v decimals))]
+                (if (nil? v)
+                  ""
+                  ;; Note: this might lead to not actually showing the real value to the user
+                  (.toFixed v decimals)))]
   (defn fixnum
     "An input type for a float, but when entered and displayed, exactly the given number of
   decimal places are used or shown respectively."
@@ -213,8 +213,10 @@
               (long (* (double (parse-fixnum s))
                        (js/Math.exp 10 decimals))))
       unparse (fn [decimals unparse-fixnum v]
-                (unparse-fixnum (/ (double v)
-                                   (js/Math.exp 10 decimals))))]
+                (if (nil? v)
+                  ""
+                  (unparse-fixnum (/ (double v)
+                                     (js/Math.exp 10 decimals)))))]
   (defn decimal
     "A input type for an integer, but represented and entered as `(/ v (^ 10
   decimals)`. E.g. 234 with 2 decimals is shown and entered as
