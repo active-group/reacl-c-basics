@@ -191,7 +191,7 @@
                     (dt/fire-event (dt/get env (dt/by-testid "btn")) :click)
 
                     ;; getting completed state/response, asynchronously.
-                    (new js/Promise.
+                    (new js/Promise
                          (fn [resolve reject]
                            (js/setTimeout (fn []
                                             (is (= 1 @completed))
@@ -200,3 +200,18 @@
                                           1)))))))
              (.then (fn [_] (done))))))
 
+(deftest real-execute-test
+  (async done
+         (let [res (atom nil)
+               p (new js/Promise (fn [resolve reject]
+                                   (reset! res resolve)))]
+           (dt/rendering
+            (-> (ajax/execute (ajax/GET "http://invalid.invalid/"))
+                (c/handle-action (fn [_ r]
+                                   (@res r)
+                                   r)))
+            (fn [env]
+              (.then p
+                     (fn [res]
+                       (is (ajax/response? res))
+                       (done))))))))

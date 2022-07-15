@@ -103,7 +103,9 @@
 (defn PURGE "Returns a PURGE request." [uri & [options]] (request ajax/PURGE uri options))
 
 (defn- execute-request! [request handler]
-  (let [{f :f uri :uri options :options} request
+  (let [f (request-f request)
+        uri (request-uri request)
+        options (request-options request)
         conv (or (:convert-response options) identity)
         nopts (-> options
                   (assoc :handler
