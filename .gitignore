@@ -5,3 +5,5 @@ pom.xml.asc
 .shadow-cljs
 node_modules
 _scratch
+.lein-repl-history
+.nrepl-port
