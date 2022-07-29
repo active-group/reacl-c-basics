@@ -3,6 +3,7 @@
             [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom]
             [reacl-c.test-util.core :as tuc :include-macros true]
+            [reacl-c-basics.jobs.core :as jobs]
             [reacl-c.test-util.dom-testing :as dt]
             [active.clojure.functions :as f]
             [active.clojure.lens :as lens]
@@ -15,11 +16,6 @@
 (c/defn-subscription sync! deliver! [value]
   (deliver! value)
   (fn [] nil))
-
-(c/defn-subscription async! deliver! [value]
-  (let [id (js/setTimeout #(deliver! value) 0)]
-    (fn []
-      (js/clearTimeout id))))
 
 (c/defn-subscription reveal deliver! [a]
   (reset! a deliver!)
@@ -128,77 +124,12 @@
   (is (= (ajax/GET "/url") (ajax/GET "/url"))))
 
 (deftest delivery-test
-  (async done
-         (-> (let [req  (ajax/GET "http://invalid.invalid")
-                   resp (ajax/ok-response :v)
-                   result (atom nil)
-                   states (atom [])]
-               (testing "starts running a job and completes eventually"
-                 (dt/rendering
-                  (-> (ajax/delivery (dom/button {:data-testid "btn"
-                                                  :onclick (fn [_ _]
-                                                             (c/return :action (ajax/deliver req :info)))})
-                                     (fn transition [state job]
-                                       (swap! states conj (ajax/delivery-job-status job))
-                                       (when (ajax/completed? job)
-                                         (reset! result (ajax/delivery-job-response job)))
-                                       (c/return)))
-                      (tuc/map-subscriptions {(ajax/execute req) (async! resp)}))
-                  (fn [env]
-                    ;; nothing happens initially.
-                    (is (= [] @states))
-
-                    ;; deliver a job
-                    (dt/fire-event (dt/get env (dt/by-testid "btn")) :click)
-                    (is (= [:pending :running] @states))
-
-                    ;; getting completed state/response, asynchronously.
-                    (new js/Promise.
-                         (fn [resolve reject]
-                           (js/setTimeout (fn []
-                                            (is (= [:pending :running :completed] @states))
-                                            (is (= resp @result))
-                                            (resolve :done))
-                                          1)))))))
-             (.then (fn [_] (done))))))
-
-(deftest delivery-manage-test
-  (async done
-         (-> (let [req  (ajax/GET "http://invalid.invalid")
-                   resp (ajax/ok-response :v)
-                   completed (atom 0)
-                   last-queue (atom nil)]
-               (testing "start 3 jobs, but only one completes"
-                 (dt/rendering
-                  (-> (ajax/delivery (dom/button {:data-testid "btn"
-                                                  :onclick (fn [_ _]
-                                                             (c/return :action (ajax/deliver req)
-                                                                       :action (ajax/deliver req)
-                                                                       :action (ajax/deliver req)))})
-                                     (fn transition [state job]
-                                       (when (ajax/completed? job)
-                                         (swap! completed inc))
-                                       (c/return))
-                                     (fn manage [queue]
-                                       (let [q (if (empty? queue)
-                                                 queue
-                                                 [(last queue)])]
-                                         (reset! last-queue q)
-                                         q)))
-                      (tuc/map-subscriptions {(ajax/execute req) (async! resp)}))
-                  (fn [env]
-                    ;; deliver jobs
-                    (dt/fire-event (dt/get env (dt/by-testid "btn")) :click)
-
-                    ;; getting completed state/response, asynchronously.
-                    (new js/Promise
-                         (fn [resolve reject]
-                           (js/setTimeout (fn []
-                                            (is (= 1 @completed))
-                                            (is (empty? @last-queue))
-                                            (resolve))
-                                          1)))))))
-             (.then (fn [_] (done))))))
+  ;; the ajax delivery is just jobs/handle-jobs with a default executer.
+  (is (= (jobs/handle-jobs c/empty
+                           {:execute ajax/execute
+                            :predicate ajax/request?
+                            :parallelity nil})
+         (ajax/delivery c/empty))))
 
 (deftest real-execute-test
   (async done

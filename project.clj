@@ -1,4 +1,4 @@
-(defproject de.active-group/reacl-c-basics "0.11.1"
+(defproject de.active-group/reacl-c-basics "0.11.2-SNAPSHOT"
   :description "Library with utilities often useful when writing web applications with Reacl-C."
   
   :url "http://github.com/active-group/reacl-c-basics"
