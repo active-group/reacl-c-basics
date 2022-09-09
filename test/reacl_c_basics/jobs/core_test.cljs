@@ -8,7 +8,8 @@
             [cljs.test :refer (is deftest testing async) :include-macros true]))
 
 (c/defn-subscription async! deliver! [resp req]
-  (let [id (js/setTimeout #(deliver! resp) 0)]
+  (let [id (js/setTimeout (fn []
+                            (deliver! resp)) 0)]
     (fn []
       (js/clearTimeout id))))
 
@@ -59,17 +60,21 @@
                                                  1))))))
              (.then (fn [_] (done))))))
 
+;; TODO: a bit unstable
 (deftest handle-jobs-manage-test
   ;; :manage can remove things from the queue.
   (async done
          (-> (let [req  :my-job
                    resp :my-result
-                   completed (atom 0)
+                   [completed! completed] (let [a (atom nil)]
+                                            [a
+                                             (new js/Promise (fn [resolve reject]
+                                                               (reset! a resolve)))])
                    last-queue (atom nil)]
                (run-with {:execute (partial async! resp)
                           :transition (fn transition [state job]
                                         (when (= :completed (jobs/job-status job))
-                                          (swap! completed inc))
+                                          (@completed! true))
                                         (c/return))
                           :manage (fn manage [queue]
                                     (let [q (if (empty? queue)
@@ -83,14 +88,9 @@
                                    :action (jobs/start-job req))
 
                          (fn [env]
-                           ;; getting completed state/response, asynchronously.
-                           (new js/Promise
-                                (fn [resolve reject]
-                                  (js/setTimeout (fn []
-                                                   (is (= 1 @completed))
-                                                   (is (empty? @last-queue))
-                                                   (resolve))
-                                                 1))))))
+                           (.then completed
+                                  (fn [_]
+                                    (is (empty? @last-queue)))))))
              (.then (fn [_] (done))))))
 
 (deftest handle-jobs-parallelity-test
