@@ -42,20 +42,21 @@
   (defn- do-report-validity [ref]
     (c/dynamic (f/partial f ref))))
 
-(let [g (fn [f attrs content r]
-          (c/fragment (apply f (-> attrs
-                                   (assoc :ref r)
-                                   (dissoc attrs :invalid :report-validity))
-                             content)
-                      (when (:invalid attrs)
-                        (c/init (c/return :action (set-custom-validity! r (:invalid attrs)))))
-                      (when (:report-validity attrs)
-                        (do-report-validity r))))]
+(let [add-validity-features
+      (fn [f attrs content r]
+        (c/fragment (apply f (-> attrs
+                                 (assoc :ref r)
+                                 (dissoc attrs :invalid :report-validity))
+                           content)
+                    (when (:invalid attrs)
+                      (c/init (c/return :action (set-custom-validity! r (:invalid attrs)))))
+                    (when (:report-validity attrs)
+                      (do-report-validity r))))]
   (defn- with-invalid-attr [f attrs & content]
     ;; Note: when :invalid was set before, it must be set to "" (not nil) to remove that state.
     (if (or (:invalid attrs) (:report-validity attrs))
       (maybe-with-ref (:ref attrs)
-                      (f/partial g f attrs content))
+                      (f/partial add-validity-features f attrs content))
       (apply f attrs content))))
 
 (defn- input-base [f attrs]
