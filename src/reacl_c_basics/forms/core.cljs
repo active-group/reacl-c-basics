@@ -98,16 +98,19 @@
 (def ^:private input-button-base (partial static-base dom/input))
 
 (c/defn-effect ^:private reset-input! [input-ref]
-  (set! (.-value (c/deref input-ref)) ""))
+  (when-let [d (c/deref input-ref)]
+    (set! (.-value d) "")))
 
 (let [on-change-single (fn [_ event]
                          (first (.. event -currentTarget -files)))
       on-change-multi (fn [_ event]
                         (.. event -currentTarget -files))
-      maybe-reset (fn [value ref]
-                    ;; we could compare dom element with value here... but just ignore when non-nil comes in for now.
-                    (when (or (nil? value) (empty? value))
-                      (c/init (c/return :action (reset-input! ref)))))]
+      maybe-reset-single (fn [value ref]
+                           (when (nil? value)
+                             (c/init (c/return :action (reset-input! ref)))))
+      maybe-reset-multi (fn [value ref]
+                          (when (empty? value)
+                            (c/init (c/return :action (reset-input! ref)))))]
   (defn ^:private input-file-base
     [attrs]
     ;; The thing with file inputs is that they cannot be 'controlled'; the application cannot chose a file, only the user.
@@ -115,12 +118,15 @@
     (maybe-with-ref
      (:ref attrs)
      (fn [ref]
-       (c/fragment (c/dynamic maybe-reset ref)
-                   (dom/input (dom/merge-attributes {:onChange (if (:multiple attrs)
+       (c/fragment (dom/input (dom/merge-attributes {:onChange (if (:multiple attrs)
                                                                  on-change-multi
                                                                  on-change-single)
                                                      :ref ref}
-                                                    attrs)))))))
+                                                    attrs))
+                   (c/dynamic (if (:multiple attrs)
+                                maybe-reset-multi
+                                maybe-reset-single)
+                              ref))))))
 
 (defn ^:no-doc new-type [base-fn default-attrs mk-optional]
   ;; Note: base must not be (fundamentally) changed (or, only together with to-optional)
