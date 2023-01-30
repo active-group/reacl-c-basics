@@ -192,7 +192,7 @@ places, use [[integer]]."} strict-integer
   using [[option]] items directly."
   [attrs]
   (apply core/select (dissoc attrs :options :optional?)
-         (when (:optional? attrs)
+         (when (and (:optional? attrs) (not (some nil? (map first (:options attrs)))))
            (core/option {:value nil} ""))
          (map (fn [[value label]]
                 (core/option {:value value} label))
