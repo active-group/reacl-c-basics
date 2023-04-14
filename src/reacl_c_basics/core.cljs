@@ -27,7 +27,7 @@
   "Subscription to a timer, emitting `true` or `action` as an action once, after the given number of milliseconds."
   deliver! [ms & [action]]
   (let [id (js/window.setTimeout (fn []
-                                   (deliver! (when (some? action) action true)))
+                                   (deliver! (if (some? action) action true)))
                                  ms)]
     (fn []
       (js/window.clearTimeout id))))
@@ -36,7 +36,7 @@
   "Subscription to a timer, emitting `true` or `action` as an action every given milliseconds."
   deliver! [ms & [action]]
   (let [id (js/window.setInterval (fn []
-                                    (deliver! (when (some? action) action true)))
+                                    (deliver! (if (some? action) action true)))
                                   ms)]
     (fn []
       (js/window.clearInterval id))))
