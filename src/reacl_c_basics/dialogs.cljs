@@ -9,6 +9,7 @@
   (:require [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom :include-macros true]
             [clojure.string :as string]
+            [active.clojure.lens :as lens]
             [active.clojure.functions :as f]))
 
 (def ^{:doc "The raw <dialog> dom item."}
@@ -131,3 +132,74 @@
           :cancel :onCancel}
          (cancel)
          content))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- gen-id [_]
+  (random-uuid))
+
+(defrecord ^:private Show [id value])
+
+(defn- ->show
+  ([id]
+   (->show id nil))
+  ([id value]
+   (->Show id value)))
+
+(defrecord ^:private Hide [id])
+
+(c/defn-item mediator
+  "A mediator simplifies showing modal dialogs in response to actions.
+
+   That can be used to let the user confirm certain actions, with a
+   \"Are you sure?\" dialog, or even open an edit dialog in response
+   to a button click. It could also be used to let the user acknowedge
+   errors of Ajax calls.
+
+   For example, if you have a button that deletes an entity:
+
+   ```
+   (dom/button {:onClick (constantly (c/return :action (delete entity-id)))})
+   ```
+
+   To get an acknowledgement from the user before doing that, you can
+   rewrite that button with:
+
+   ```
+   (mediator (fn [hide entity-id]
+               (prompt {:onOk (constantly (c/return :action hide
+                                                    :action (delete entity-id)))
+                        :onCancel (constantly (c/return :action hide))}
+                       \"Are you sure?\"
+                       (dom/button {:onClick (constantly (c/return :action (ok)))} \"Ok\")))
+             (fn [show]
+               (dom/button {:onClick (constantly (c/return :action (show entity-id)))})))
+   ```
+
+   Note: Emitting a second `(show ...)` before the previous dialog has
+   emitted `hide` will replace the previous dialog.
+"
+  [ask-f item-f]
+  (c/with-state-as [_ [id show-v] :local [nil ::none]]
+    (if (nil? id)
+      (c/focus (lens/>> lens/second lens/first) (c/once (f/partial gen-id)))
+      (c/fragment
+       (-> (c/focus lens/first (item-f (f/partial ->show id)))
+           (c/handle-action (fn [state a]
+                              (cond
+                                (instance? Show a)
+                                (c/return :state (assoc-in state [1 1] (:value a)))
+
+                                :else
+                                (c/return :action a)))))
+       (c/focus lens/second
+                (when (not= show-v ::none)
+                  (-> (ask-f (Hide. id)
+                             show-v)
+                      (c/handle-action (fn [state a]
+                                         (cond
+                                           (instance? Hide a)
+                                           (c/return :state (assoc-in state [1] ::none))
+
+                                           :else
+                                           (c/return :action a)))))))))))
