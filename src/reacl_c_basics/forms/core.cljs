@@ -268,6 +268,75 @@
   [attrs & content]
   (apply with-invalid-attr dom/form attrs content))
 
+(let [t-submit (fn [[external internal] ev]
+                 (.preventDefault ev)
+                 [internal internal])
+      t-reset (fn [[external internal] ev]
+                (.preventDefault ev)
+                [external external])]
+  (dom/defn-dom transient-form
+    "Same as [[form]], but the state of `content` is a copy of the form state,
+     and form submit and form reset publish or discard the modified state
+     respectively."
+    [attrs & content]
+    (c/with-state-as external
+      (c/with-state-as [_ internal :local external]
+        (form (dom/merge-attributes attrs
+                                    {:onSubmit t-submit
+                                     :onReset t-reset})
+              (c/focus lens/second
+                       (apply c/fragment content)))))))
+
+(let [t-submit (fn [[external local] ev]
+                 (.preventDefault ev)
+                 [external (assoc local :submit true)])
+      t-reset (fn [[external local] ev]
+                (.preventDefault ev)
+                [external (assoc local :internal external)])]
+  (dom/defn-dom subscription-form
+    "Same as [[transient-form]] but on form submit the
+subscription `((:subscription attrs) state)` is used, which should emit the
+result of an asynchronous operation.
+
+If that result action denotes a successful operation
+(using `((:successful? attrs) result)`, which defaults to constantly
+true), then the form state is set to the state submitted.
+
+If `(:emit-result? attrs)` is true, then the result action is
+re-emitted from the form. That allows to reset the state to a value
+contained in the result, to set an external error flag, or to close a
+modal in which the form is shown.
+
+The form is disabled automatically while the asynchronous operation is
+in progress.
+
+See [[reacl-c-basics.ajax/form]] for a version of this that is
+specialized to submitting values via ajax."
+    [attrs & content]
+    (let [submit (:subscription attrs)
+          successful? (or (:successful? attrs) (constantly true))
+          emit-result? (:emit-result? attrs)]
+      (assert (some? submit) "Missing :submit attribute.")
+      (c/with-state-as external
+        (c/with-state-as [_ local :local {:internal external :subscription false}]
+          (form (dom/merge-attributes (dissoc attrs :submit :successful? :emit-result?)
+                                      {:onSubmit t-submit
+                                       :onReset t-reset})
+                (c/focus (lens/>> lens/second :internal)
+                         (dom/fieldset {:disabled (:submit local)}
+                                       (apply c/fragment content)))
+                (when (:submit local)
+                  (-> (submit (:internal local))
+                      (c/handle-action (fn [[external local] result]
+                                         (cond-> (c/return :state [(if (successful? result)
+                                                                     ;; internal -> external
+                                                                     (:internal local)
+                                                                     ;; else keep external
+                                                                     external)
+                                                                   (assoc local :submit false)])
+                                           emit-result? (c/merge-returned (c/return :action result)))))))))))))
+
+
 (defn- lift-type [t]
   (if (type? t)
     t

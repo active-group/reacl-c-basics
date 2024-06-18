@@ -1,10 +1,12 @@
 (ns reacl-c-basics.ajax-test
   (:require [reacl-c-basics.ajax :as ajax]
+            [reacl-c-basics.ajax-test-util :as ajax-test-util]
             [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom]
             [reacl-c.test-util.core :as tuc :include-macros true]
             [reacl-c-basics.jobs.core :as jobs]
             [reacl-c.test-util.dom-testing :as dt]
+            [reacl-c-basics.forms.core :as forms]
             [active.clojure.functions :as f]
             [active.clojure.lens :as lens]
             [cljs.test :refer (is deftest testing async) :include-macros true]))
@@ -146,3 +148,30 @@
                      (fn [res]
                        (is (ajax/response? res))
                        (done))))))))
+
+(deftest form-test
+  (let [post (fn [v] (ajax/POST "http://invalid.invalid/" {:params v}))]
+    (dt/rendering
+     (-> (ajax/form {:data-testid "form"
+                     :request post}
+                    (c/focus :foo (forms/input {:data-testid "input" :type "text"}))
+                    (dom/input {:data-testid "submit" :type "submit"}))
+         (ajax-test-util/emulate-requests
+          {(post {:foo "baz"}) (ajax/make-response true :ok)}))
+     :state {:foo "bar"}
+     (fn [env]
+       (let [input (dt/get env (dt/by-testid "input"))
+             submit-btn (dt/get env (dt/by-testid "submit"))]
+
+         ;; change value to baz
+         (dt/fire-event input
+                        :change {:target {:value "baz"}})
+
+         ;; not published yet
+         (is (= {:foo "bar"} (dt/current-state env)))
+
+         ;; submit (with ok response)
+         (dt/fire-event submit-btn :click)
+
+         ;; state changed
+         (is (= {:foo "baz"} (dt/current-state env))))))))
