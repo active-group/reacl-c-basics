@@ -35,8 +35,9 @@
   simulate server responses in unit tests.
   "
   (:require [reacl-c.core :as c :include-macros true]
-            [reacl-c.dom :as dom]
+            [reacl-c.dom :as dom :include-macros true]
             [reacl-c-basics.jobs.core :as jobs]
+            [reacl-c-basics.forms.core :as forms]
             [active.clojure.cljs.record :as r :include-macros true]
             [active.clojure.functions :as f]
             [active.clojure.lens :as lens]
