@@ -21,7 +21,7 @@
   ```
   (delivery
    (dom/button
-    {:onclick #(c/return :action (deliver (PUT \"/resource\" {:body v})))}))
+    {:onClick #(c/return :action (deliver (PUT \"/resource\" {:body v})))}))
   ```
 
   Note that all items cancel outstanding requests when they are

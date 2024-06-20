@@ -137,7 +137,7 @@
           (a/await
            (run-async
             (p/await-state (fn [running?]
-                             (dom/button {:onclick (constantly "4") :disabled (not running?)} "click"))
+                             (dom/button {:onClick (constantly "4") :disabled (not running?)} "click"))
                            #(= % "4"))
             (fn [env]
               (a/async
@@ -154,7 +154,7 @@
           (a/await
            (run-async
             (p/await-action (fn [running?]
-                              (dom/button {:onclick (constantly (c/return :action "4")) :disabled (not running?)} "click"))
+                              (dom/button {:onClick (constantly (c/return :action "4")) :disabled (not running?)} "click"))
                             string?)
             (fn [env]
               (a/async

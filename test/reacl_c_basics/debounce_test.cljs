@@ -10,7 +10,7 @@
 #_(deftest debounce-test
   (let [af-env (tu/subscription-emulator-env (debounce/animation-frame))
         
-        env (tu/env (c/dynamic (f/constantly (debounce/debounce (dom/div {:onclick (constantly (c/return :state :change))}))))
+        env (tu/env (c/dynamic (f/constantly (debounce/debounce (dom/div {:onClick (constantly (c/return :state :change))}))))
                     {:emulator (tu/subscription-emulator af-env)})]
 
     (tu/mount! env :start)
