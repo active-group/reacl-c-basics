@@ -174,4 +174,43 @@
          (dt/fire-event submit-btn :click)
 
          ;; state changed
-         (is (= {:foo "baz"} (dt/current-state env))))))))
+         (is (= {:foo "baz"} (dt/current-state env)))))))
+
+  (testing "onSubmit can change the value to be submitted"
+    (let [post (fn [v] (ajax/POST "http://invalid.invalid/" {:params v}))
+          requests (atom [])]
+      (dt/rendering
+       ;; Note: reacl-c.main.react/embed, which dom-testing uses,
+       ;; currently has a bug/inconvenience, in that simultaneous
+       ;; state changes are not seen be actions handlers (takes a
+       ;; rendering roundtrip). Using isolate-state to work around
+       ;; that here.
+       (c/isolate-state
+        {:foo "bar"}
+        (-> (ajax/form {:data-testid "form"
+                        :request post
+                        :onSubmit (fn [state]
+                                    (c/return :state (update state :foo str "zinga")))}
+                       (c/focus :foo (forms/input {:data-testid "input" :type "text"}))
+                       (dom/input {:data-testid "submit" :type "submit"}))
+            (ajax-test-util/emulate-requests
+             (fn [req]
+               (swap! requests conj req)
+               ({(post {:foo "bazzinga"}) (ajax/make-response true :ok)}
+                req)))))
+       ;; :state {:foo "bar"}
+       (fn [env]
+         (let [input (dt/get env (dt/by-testid "input"))
+               submit-btn (dt/get env (dt/by-testid "submit"))]
+
+           ;; change value to baz and submit
+           (dt/fire-event input
+                          :change {:target {:value "baz"}})
+           (dt/fire-event submit-btn :click)
+
+           ;; state changed, and request was made
+           ;; ideally the request before the state change in :onSubmit isn't even tried;
+           (is (= [(post {:foo "bazzinga"})] @requests))
+
+           ;; (is (= {:foo "bazzinga"} (dt/current-state env)))
+           ))))))

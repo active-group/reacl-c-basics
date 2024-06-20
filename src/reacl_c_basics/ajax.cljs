@@ -296,15 +296,15 @@ given request and deliver the response as soon as it is available."
 (dom/defn-dom form
   "A form to allow the user to edit the state and submit it using an Ajax request.
 
-   The state of `content` is a copy of the form state until a form
-   submit (or reset) happens. On submit, the Ajax request `((:request
-   attrs) state)` is executed. If that is successful (`((:successful?
-   attrs) response)`, which defaults to [[response-ok?]]), the form
-   state is updated.
+   Initially, the state of `content` is a copy of the form state until
+   a form submit (or reset) happens. On submit the form state is
+   changed to the edited state, and the Ajax request `((:request
+   attrs) state)` is executed.
 
-   Set `(:emit-result? attrs)` to add additional handling of the
-   result, like using a value returned from the server as the new
-   state, or to set an error flag.
+   Optionally, the event handlers `:onSubmit` and `:onReset` (both
+   called without additional arguments) and `:onComplete` (called with
+   the result of the ajax call as the event value) can be specified in
+   the attributes.
 
    The form is automatically disabled while the request is running.
 
@@ -313,8 +313,6 @@ given request and deliver the response as soon as it is available."
   [attrs & content]
   (assert (some? (:request attrs)) "Missing :request attribute.")
   (apply forms/subscription-form
-         (dom/merge-attributes attrs
-                               {:subscription (f/comp execute (:request attrs))
-                                :emit-result? (:emit-result? attrs)
-                                :successful? (or (:successful? attrs) response-ok?)})
+         (dom/merge-attributes (dissoc attrs :request)
+                               {:subscription (f/comp execute (:request attrs))})
          content))

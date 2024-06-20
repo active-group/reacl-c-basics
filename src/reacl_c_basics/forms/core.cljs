@@ -287,54 +287,61 @@
               (c/focus lens/second
                        (apply c/fragment content)))))))
 
-(let [t-submit (fn [[external local] ev]
+(let [t-submit (fn [on-submit [[external internal] submit?] ev]
                  (.preventDefault ev)
-                 [external (assoc local :submit true)])
-      t-reset (fn [[external local] ev]
+                 (cond-> (c/return :state [[internal internal] true])
+                   (some? on-submit) (c/merge-returned (c/return :action (c/call-handler on-submit)))))
+      t-reset (fn [on-reset [[external internal] submit?] ev]
                 (.preventDefault ev)
-                [external (assoc local :internal external)])]
+                (cond-> (c/return :state [[external external] false])
+                  (some? on-reset) (c/merge-returned (c/return :action (c/call-handler on-reset)))))
+      t-complete  (fn [on-complete [[external internal] submit?] result]
+                    (cond-> (c/return :state [[external internal]
+                                              false])
+                      (some? on-complete) (c/merge-returned (c/return :action (c/call-handler on-complete result)))))]
   (dom/defn-dom subscription-form
-    "Same as [[transient-form]] but on form submit the
-subscription `((:subscription attrs) state)` is used, which should emit the
-result of an asynchronous operation.
+    "A form that is submitted asynchronously via a subscription item.
 
-If that result action denotes a successful operation
-(using `((:successful? attrs) result)`, which defaults to constantly
-true), then the form state is set to the state submitted.
+     Initially, the state of `content` is a copy of the state. On form
+     submit, the form state is set to the edited state, and the
+     subscription `((:subscription attrs) state)` is rendered, until it
+     delivers a result. On form reset the edited state is discarded.
 
-If `(:emit-result? attrs)` is true, then the result action is
-re-emitted from the form. That allows to reset the state to a value
-contained in the result, to set an external error flag, or to close a
-modal in which the form is shown.
+     Optionally, the event handlers `:onSubmit` and `:onReset` (both
+     called without additional arguments) and `:onComplete` (with the
+     result of the subscription as the event value) can be set in the
+     attributes. If `:onSubmit` will see the modified state, and if it
+     changes the state, then that will be passed to `:subscription`
+     instead.
 
-The form is disabled automatically while the asynchronous operation is
-in progress.
+     The form is disabled automatically while the asynchronous operation is
+     in progress.
 
-See [[reacl-c-basics.ajax/form]] for a version of this that is
-specialized to submitting values via ajax."
+     See [[reacl-c-basics.ajax/form]] for a version of this that is
+     specialized to submitting values via ajax."
     [attrs & content]
-    (let [submit (:subscription attrs)
-          successful? (or (:successful? attrs) (constantly true))
-          emit-result? (:emit-result? attrs)]
-      (assert (some? submit) "Missing :submit attribute.")
+    (let [subscription (:subscription attrs)
+          on-submit  (:onSubmit attrs)
+          on-complete (:onComplete attrs)
+          on-reset (:onReset attrs)]
+      (assert (some? subscription) "Missing :subscription attribute.")
       (c/with-state-as external
-        (c/with-state-as [_ local :local {:internal external :subscription false}]
-          (form (dom/merge-attributes (dissoc attrs :submit :successful? :emit-result?)
-                                      {:onSubmit t-submit
-                                       :onReset t-reset})
-                (c/focus (lens/>> lens/second :internal)
-                         (dom/fieldset {:disabled (:submit local)}
-                                       (apply c/fragment content)))
-                (when (:submit local)
-                  (-> (submit (:internal local))
-                      (c/handle-action (fn [[external local] result]
-                                         (cond-> (c/return :state [(if (successful? result)
-                                                                     ;; internal -> external
-                                                                     (:internal local)
-                                                                     ;; else keep external
-                                                                     external)
-                                                                   (assoc local :submit false)])
-                                           emit-result? (c/merge-returned (c/return :action result)))))))))))))
+        ;; Note: split the two local states (so that a new external resets the internal state, but not the submit flag)
+        ;; By doing that, the :onSubmit handler can set a new external state, which is then the one being committed!
+        (c/local-state
+         external
+         (c/local-state
+          false
+          (c/with-state-as [[external internal] submit?]
+            (form (dom/merge-attributes (dissoc attrs :subscription :onSubmit :onComplete :onReset)
+                                        {:onSubmit (f/partial t-submit on-submit)
+                                         :onReset (f/partial t-reset on-reset)})
+                  (c/focus (lens/>> lens/first lens/second) ;; focus on 'internal'
+                           (apply dom/fieldset {:disabled submit?}
+                                  content))
+                  (when submit?
+                    (-> (subscription internal)
+                        (c/handle-action (f/partial t-complete on-complete))))))))))))
 
 
 (defn- lift-type [t]
