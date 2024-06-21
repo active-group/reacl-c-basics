@@ -178,7 +178,8 @@
 
   (testing "onSubmit can change the value to be submitted"
     (let [post (fn [v] (ajax/POST "http://invalid.invalid/" {:params v}))
-          requests (atom [])]
+          requests (atom [])
+          final-state (atom nil)]
       (dt/rendering
        ;; Note: reacl-c.main.react/embed, which dom-testing uses,
        ;; currently has a bug/inconvenience, in that simultaneous
@@ -187,17 +188,19 @@
        ;; that here.
        (c/isolate-state
         {:foo "bar"}
-        (-> (ajax/form {:data-testid "form"
-                        :request post
-                        :onSubmit (fn [state]
-                                    (c/return :state (update state :foo str "zinga")))}
-                       (c/focus :foo (forms/input {:data-testid "input" :type "text"}))
-                       (dom/input {:data-testid "submit" :type "submit"}))
-            (ajax-test-util/emulate-requests
-             (fn [req]
-               (swap! requests conj req)
-               ({(post {:foo "bazzinga"}) (ajax/make-response true :ok)}
-                req)))))
+        (c/with-state-as state
+          (reset! final-state state)
+          (-> (ajax/form {:data-testid "form"
+                          :request post
+                          :onSubmit (fn [state ev]
+                                      (c/return :state (update state :foo str "zinga")))}
+                         (c/focus :foo (forms/input {:data-testid "input" :type "text"}))
+                         (dom/input {:data-testid "submit" :type "submit"}))
+              (ajax-test-util/emulate-requests
+               (fn [req]
+                 (swap! requests conj req)
+                 ({(post {:foo "bazzinga"}) (ajax/make-response true :ok)}
+                  req))))))
        ;; :state {:foo "bar"}
        (fn [env]
          (let [input (dt/get env (dt/by-testid "input"))
@@ -212,5 +215,5 @@
            ;; ideally the request before the state change in :onSubmit isn't even tried;
            (is (= [(post {:foo "bazzinga"})] @requests))
 
-           ;; (is (= {:foo "bazzinga"} (dt/current-state env)))
-           ))))))
+           ;; can't use dt/current-state, because of 'isolate-state'
+           (is (= {:foo "bazzinga"} @final-state))))))))

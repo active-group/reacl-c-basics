@@ -268,80 +268,210 @@
   [attrs & content]
   (apply with-invalid-attr dom/form attrs content))
 
-(let [t-submit (fn [[external internal] ev]
-                 (.preventDefault ev)
-                 [internal internal])
-      t-reset (fn [[external internal] ev]
-                (.preventDefault ev)
-                [external external])]
+(defn- unbind [handler]
+  ;; hacky hacky... should be part of reacl-c
+  (when handler
+    (when (c/bound-handler? handler)
+      ;; a bound handler is function, that when called returns a 'c/return :action CallHandler' thingy, which contains the original handler fn.
+      (let [ch (handler nil)]
+        (:f (first (c/returned-actions ch)))))))
+
+(let [t-submit (fn [on-submit [external internal] ev]
+                 ;; call on-submit on internal (not yet committed) state, which it may change or not.
+                 ;; publish internal => external unless preventDefault was called.
+                 ;; (note in any case we eventually call preventDefault to prevent browser action)
+                 (let [ret (if (some? on-submit)
+                             (c/as-returned (on-submit internal ev))
+                             (c/return))]
+                   (let [new-internal (c/returned-state ret)]
+                     (cond
+                       ;; no modification of state, and no actual submit.
+                       (and (= c/keep-state new-internal)
+                            (.-defaultPrevented ev))
+                       (c/returned-state ret c/keep-state)
+
+                       :else
+                       (let [new-internal (if (= c/keep-state new-internal)
+                                            internal
+                                            new-internal)
+                             new-external (if (.-defaultPrevented ev)
+                                            external
+                                            (do (.preventDefault ev)
+                                                new-internal))]
+                         (c/returned-state ret [new-external new-internal]))))))
+      t-reset (fn [on-reset [external internal] ev]
+                ;; calls on-reset on internal (not yet resetted) state; if it returns a state, then that is used.
+                ;; if it doesn't, then it depends on preventDefault: per default use external state as new internal one.
+                ;; otherwise, don't change anything (cancels the reset)
+                (let [ret (if (some? on-reset)
+                            (c/as-returned (on-reset internal ev))
+                            (c/return))]
+                  (cond
+                    ;; on-reset returned new (internal) state
+                    (not= c/keep-state (c/returned-state ret))
+                    (do (when-not (.-defaultPrevented ev)
+                          (.preventDefault ev))
+                        (c/returned-state ret [external (c/returned-state ret)]))
+
+                    ;; no state changes at all
+                    (.-defaultPrevented ev)
+                    ret ;; must be keep-state here
+
+                    ;; default, external => internal
+                    :else
+                    (c/returned-state ret [external external]))))]
   (dom/defn-dom transient-form
     "Same as [[form]], but the state of `content` is a copy of the form state,
      and form submit and form reset publish or discard the modified state
-     respectively."
-    [attrs & content]
-    (c/with-state-as external
-      (c/with-state-as [_ internal :local external]
-        (form (dom/merge-attributes attrs
-                                    {:onSubmit t-submit
-                                     :onReset t-reset})
-              (c/focus lens/second
-                       (apply c/fragment content)))))))
+     respectively.
 
-(let [t-submit (fn [on-submit [[external internal] submit?] ev]
-                 (.preventDefault ev)
-                 (cond-> (c/return :state [[internal internal] true])
-                   (some? on-submit) (c/merge-returned (c/return :action (c/call-handler on-submit)))))
-      t-reset (fn [on-reset [[external internal] submit?] ev]
-                (.preventDefault ev)
-                (cond-> (c/return :state [[external external] false])
-                  (some? on-reset) (c/merge-returned (c/return :action (c/call-handler on-reset)))))
-      t-complete  (fn [on-complete [[external internal] submit?] result]
-                    (cond-> (c/return :state [[external internal]
-                                              false])
-                      (some? on-complete) (c/merge-returned (c/return :action (c/call-handler on-complete result)))))]
+     Optionally, the event handlers `:onSubmit` and `:onReset` can be
+     set, but work differently than for normal forms. Both are called
+     with the internal, potentially modified state and an Event
+     object. In `:onSubmit` you may change the state, before it is
+     used as the new form state, unless you call `.preventDefault` on
+     the event. If `:onReset` returns a state, then that is used as
+     the resetted state. If `:onReset` does not modify the state, then
+     the internal state is set to the form state, unless
+     `.preventDefault` is called on the event."
+    [attrs & content]
+    (let [on-submit (unbind (:onSubmit attrs))
+          on-reset (unbind (:onReset attrs))]
+      (c/with-state-as external
+        (c/local-state external
+          (form (dom/merge-attributes attrs
+                                      {:onSubmit (f/partial t-submit on-submit)
+                                       :onReset (f/partial t-reset on-reset)})
+                (c/focus lens/second
+                         (apply c/fragment content))))))))
+
+(defrecord ^:private Complete [state result])
+
+(defn- complete-event [state result]
+  #js {"submitted" state
+       "result" result
+       "defaultPrevented" false
+       "preventDefault" (fn []
+                          (this-as this
+                            (set! (.-defaultPrevented this) true)))})
+
+(let [ts-submit (fn [on-submit [state submit?] ev]
+                  (let [ret (if (some? on-submit)
+                              (c/as-returned (on-submit state ev))
+                              (c/return))]
+                    (cond
+                      ;; submit cancelled; but new (unsubmitted) state may be set.
+                      (.-defaultPrevented ev)
+                      (c/returned-state ret
+                                        (if (= c/keep-state (c/returned-state ret))
+                                          c/keep-state
+                                          [(c/returned-state ret) false]))
+
+                      ;; don't publish yet, but set submit? flag.
+                      :else
+                      (do (.preventDefault ev)
+                          (c/returned-state ret [(if (= c/keep-state (c/returned-state ret))
+                                                   state
+                                                   (c/returned-state ret))
+                                                 true])))))
+      
+      ts-reset (fn [on-reset [state submit?] ev]
+                 ;; Nothing special, only unwrap/wrap the submit flag
+                 (let [ret (if (some? on-reset)
+                             (c/as-returned (on-reset state ev))
+                             (c/return))]
+                   (c/returned-state ret (if (= c/keep-state (c/returned-state ret))
+                                           c/keep-state
+                                           [(c/returned-state ret) submit?]))))
+      
+      ts-inner-complete (fn [[state submit?] result]
+                          ;; state is the submitted, but yet published state here
+                          ;; need to pass the state up, to actually change the form state.
+                          ;; but submit? flag must be changed locally.
+                          (c/return :state [state false]
+                                    :action (->Complete state result)))
+      
+      ts-outer-complete (fn [on-complete state a]
+                          ;; state is the form state here; need to update that after subscription completes.
+                          ;; Note: no way to 'suppress' the publishing here (could use a syntetic event and a preventDefault call?)
+                          (cond
+                            (instance? Complete a) ;; TODO: pass that as an event-like object?
+                            (let [submitted-state (:state a)
+                                  result (:result a)]
+                              (if (some? on-complete)
+                                (let [event (complete-event submitted-state result)
+                                      ret (on-complete state event)]
+                                  (cond
+                                    (or (not= c/keep-state (c/returned-state ret))
+                                        (.-defaultPrevented event))
+                                    ret
+
+                                    :else
+                                    (c/returned-state ret submitted-state)))
+                                (c/return :state submitted-state)))
+
+                            :else
+                            (c/return :action a)))]
   (dom/defn-dom subscription-form
-    "A form that is submitted asynchronously via a subscription item.
+    "A [[transient-form]] that is submitted asynchronously via a subscription item.
 
      Initially, the state of `content` is a copy of the state. On form
-     submit, the form state is set to the edited state, and the
-     subscription `((:subscription attrs) state)` is rendered, until it
-     delivers a result. On form reset the edited state is discarded.
+     submit, the subscription `((:subscription attrs) state)` is
+     rendered, until it delivers a result. When that subscription
+     delivers a result, the form state is set to the edited state. On
+     form reset the edited state is discarded and reset to the form
+     state.
 
-     Optionally, the event handlers `:onSubmit` and `:onReset` (both
-     called without additional arguments) and `:onComplete` (with the
-     result of the subscription as the event value) can be set in the
-     attributes. If `:onSubmit` will see the modified state, and if it
-     changes the state, then that will be passed to `:subscription`
-     instead.
+     Optionally, the event handlers `:onSubmit`, `:onReset` and
+     `:onComplete` can be set.
+
+     The `:onSubmit` handler is called with the modified,
+     to-be-submitted state and an Event object. You can change the
+     internal state here, and you can call `.preventDefault` on the
+     event to cancel the submission.
+
+     The `:onReset` handler is called with the modified state and an
+     Event object. If that returns a new state, then that is published
+     as the new form state. If not, and unless `.preventDefault` is
+     called, then the modified state is discarded and set to the form
+     state.
+
+     The `:onComplete` handler is called on the original, unsubmitted
+     form state and an Event-like object. That object has a field
+     `.-result`, containing the result of the subscription and a field
+     `.-submitted` containing the submitted state, and
+     `.preventDefault` method. If the handler returns a new state,
+     then that is used as the new form state. If not, then the
+     submitted state is used as the new form state, unless
+     `.preventDefault` is called on the event.
 
      The form is disabled automatically while the asynchronous operation is
      in progress.
 
      See [[reacl-c-basics.ajax/form]] for a version of this that is
-     specialized to submitting values via ajax."
+     specialized on submitting values via ajax."
     [attrs & content]
+    ;; TODO: add :dirty-class as class to fieldset? (or add :onChange)?
     (let [subscription (:subscription attrs)
-          on-submit  (:onSubmit attrs)
-          on-complete (:onComplete attrs)
-          on-reset (:onReset attrs)]
+          on-submit  (unbind (:onSubmit attrs))
+          on-complete (unbind (:onComplete attrs))
+          on-reset (unbind (:onReset attrs))]
       (assert (some? subscription) "Missing :subscription attribute.")
-      (c/with-state-as external
-        ;; Note: split the two local states (so that a new external resets the internal state, but not the submit flag)
-        ;; By doing that, the :onSubmit handler can set a new external state, which is then the one being committed!
-        (c/local-state
-         external
-         (c/local-state
-          false
-          (c/with-state-as [[external internal] submit?]
-            (form (dom/merge-attributes (dissoc attrs :subscription :onSubmit :onComplete :onReset)
-                                        {:onSubmit (f/partial t-submit on-submit)
-                                         :onReset (f/partial t-reset on-reset)})
-                  (c/focus (lens/>> lens/first lens/second) ;; focus on 'internal'
-                           (apply dom/fieldset {:disabled submit?}
-                                  content))
-                  (when submit?
-                    (-> (subscription internal)
-                        (c/handle-action (f/partial t-complete on-complete))))))))))))
+      (-> (c/local-state
+           false ;; submit? (Note: this will never change actually; only the transient copy of it)
+           (transient-form (dom/merge-attributes (dissoc attrs :onComplete :subscription)
+                                                 {:onSubmit (f/partial ts-submit on-submit)
+                                                  :onReset (f/partial ts-reset on-reset)})
+                           ;; Note: the items here will see the modified state (so also the submit flag we set in onSubmit)
+                           (c/with-state-as [state submit?]
+                             (c/fragment
+                              (c/focus lens/first
+                                       (apply dom/fieldset {:disabled submit?}
+                                              content))
+                              (when submit?
+                                (-> (subscription state)
+                                    (c/handle-action ts-inner-complete)))))))
+          (c/handle-action (f/partial ts-outer-complete on-complete))))))
 
 
 (defn- lift-type [t]
