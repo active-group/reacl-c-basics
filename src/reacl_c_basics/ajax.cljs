@@ -293,26 +293,3 @@ given request and deliver the response as soon as it is available."
      (delivery item {:transition transition
                      :manage manage}))))
 
-(dom/defn-dom form
-  "A form to allow the user to edit the state and submit it using an Ajax request.
-
-   Initially, the state of `content` is a copy of the form state until
-   a form submit (or reset) happens. On submit the form state is
-   changed to the edited state, and the Ajax request `((:request
-   attrs) state)` is executed.
-
-   Optionally, the event handlers `:onSubmit` and `:onReset` (both
-   called without additional arguments) and `:onComplete` (called with
-   the result of the ajax call as the event value) can be specified in
-   the attributes.
-
-   The form is automatically disabled while the request is running.
-
-   Use HTML5 form validation (and [[reacl-c-basics.forms.core/input]]
-   to prevent submitting invalid states."
-  [attrs & content]
-  (assert (some? (:request attrs)) "Missing :request attribute.")
-  (apply forms/subscription-form
-         (dom/merge-attributes (dissoc attrs :request)
-                               {:subscription (f/comp execute (:request attrs))})
-         content))
