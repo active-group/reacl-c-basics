@@ -38,11 +38,14 @@
           on-complete (:onComplete attrs)]
       ;; TODO: maybe some :pending-class attr?
       (c/with-state-as [state submit? :local false]
-        (-> (base-form (dom/merge-attributes (dissoc attrs :onComplete)
+        (-> (base-form (dom/merge-attributes (dissoc attrs :onComplete :no-disable?)
                                              {:onSubmit (f/partial t-submit on-submit)})
                        (c/fragment
-                        (c/focus lens/first (apply dom/fieldset {:disabled submit?}
-                                                   content))
+                        (c/focus lens/first
+                                 ;; Note: the fieldset also disables all buttons (even with type=button); so maybe not possible in all cases.
+                                 ;; Users can manage their own flag via :onSubmit and :onComplete in those cases.
+                                 (apply dom/fieldset {:disabled (and submit? (not (:no-disable? attrs)))}
+                                        content))
                         (when submit?
                           (-> (subscription state)
                               (c/handle-action (f/partial t-complete on-complete))))))
@@ -60,7 +63,8 @@
   The `:onComplete` event handler is called with the result of the subscription.
 
   While the subscription result is pending, the content of the form is
-  automatically disabled."
+  automatically disabled, unless the `:no-disable?` attribute is true
+  on the form."
     [f & args]
     (core/new-method (f/partial subscription-wrapper (f/partial g f args)))))
 
@@ -76,6 +80,7 @@
   The `:onComplete` event handler is called with the response of the ajax call
 
   While the ajax call is running, the content of the form is
-  automatically disabled."
+  automatically disabled, unless the `:no-disable?` attribute is true
+  on the form."
     [f & args]
     (core/new-method (f/partial subscription-wrapper (f/partial g f args)))))
