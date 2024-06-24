@@ -6,57 +6,47 @@
             [active.clojure.lens :as lens]
             [active.clojure.functions :as f]))
 
-(defn- unbind [handler]
-  ;; hacky hacky... should be part of reacl-c
-  (when handler
-    (when (c/bound-handler? handler)
-      ;; a bound handler is function, that when called returns a 'c/return :action CallHandler' thingy, which contains the original handler fn.
-      (let [ch (handler nil)]
-        (:f (first (c/returned-actions ch)))))))
+(defrecord ^:private DefaultOnSubmit [ev])
 
 (let [t-submit
       (fn [on-submit [state submit?] ev]
         (if (some? on-submit)
-          (let [ret (on-submit state ev)
-                ret-state (c/returned-state ret)
-                submit? (not (.-defaultPrevented ev))]
-            (when-not (.-defaultPrevented ev)
-              (.preventDefault ev))
-            (c/returned-state ret (if (= c/keep-state ret-state)
-                                    [state submit?]
-                                    [ret-state submit?])))
-          (do (.preventDefault ev)
-              (c/return :state [state true]))))
+          (c/return :action (c/call-handler on-submit ev)
+                    ;; Note: must be handled /after/ the user action.
+                    :action (DefaultOnSubmit. ev))
+          (c/return :action (DefaultOnSubmit. ev))))
+
+      post-submit
+      (fn [[state submit?] a]
+        (cond
+          (instance? DefaultOnSubmit a)
+          (let [ev (:ev a)]
+            (if (.-defaultPrevented ev)
+              (c/return)
+              (do (.preventDefault ev) ;; prevent browser default in any case
+                  (c/return :state [state true]))))
+          :else
+          (c/return :action a)))
       
       t-complete
       (fn [on-complete [state submit?] result]
-        (if (some? on-complete)
-          (let [ret (on-complete state result)
-                ret-state (c/returned-state ret)]
-            (c/returned-state ret (if (= c/keep-state ret-state)
-                                    [state false]
-                                    [ret-state false])))
-          (c/return :state [state false])))]
-  (defn ^:private subscription-form [base-form subscription attrs & content]
-    (let [on-submit  (unbind (:onSubmit attrs))
-          on-complete (unbind (:onComplete attrs))]
+        (c/return :state [state false]
+                  :action (c/call-handler on-complete result)))]
+  (defn ^:private subscription-wrapper [subscription base-form attrs & content]
+    ;; Note: these handler must have been bound in core/form (via defn-dom)
+    (let [on-submit (:onSubmit attrs)
+          on-complete (:onComplete attrs)]
       ;; TODO: maybe some :pending-class attr?
       (c/with-state-as [state submit? :local false]
-        (base-form (dom/merge-attributes (dissoc attrs :onComplete)
-                                         {:onSubmit (f/partial t-submit on-submit)})
-                   (c/fragment
-                    (c/focus lens/first (apply dom/fieldset {:disabled submit?}
-                                               content))
-                    (when submit?
-                      (-> (subscription state)
-                          (c/handle-action (f/partial t-complete on-complete))))))))))
-
-(defn- subscription-wrapper [subscription base-form attrs & content]
-  (apply subscription-form
-         base-form
-         subscription
-         attrs
-         content))
+        (-> (base-form (dom/merge-attributes (dissoc attrs :onComplete)
+                                             {:onSubmit (f/partial t-submit on-submit)})
+                       (c/fragment
+                        (c/focus lens/first (apply dom/fieldset {:disabled submit?}
+                                                   content))
+                        (when submit?
+                          (-> (subscription state)
+                              (c/handle-action (f/partial t-complete on-complete))))))
+            (c/handle-action post-submit))))))
 
 (let [g (fn [f f-args state]
           (apply f state f-args))]

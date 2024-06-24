@@ -41,7 +41,8 @@
   (testing "onSubmit can change the value to be submitted"
     (let [post (fn [v] (ajax/POST "http://invalid.invalid/" {:params v}))
           requests (atom [])
-          final-state (atom nil)]
+          final-state (atom nil)
+          completed (atom nil)]
       (dt/rendering
        ;; Note: reacl-c.main.react/embed, which dom-testing uses,
        ;; currently has a bug/inconvenience, in that simultaneous
@@ -54,6 +55,9 @@
           (reset! final-state state)
           (-> (forms/form {:data-testid "form"
                            :method (forms-methods/ajax post)
+                           :onComplete (fn [state result]
+                                         (reset! completed result)
+                                         (c/return))
                            :onSubmit (fn [state ev]
                                        (c/return :state (update state :foo str "zinga")))}
                           (c/focus :foo (forms/input {:data-testid "input" :type "text"}))
@@ -76,6 +80,8 @@
            ;; state changed, and request was made
            ;; ideally the request before the state change in :onSubmit isn't even tried;
            (is (= [(post {:foo "bazzinga"})] @requests))
+
+           (is (= (ajax/make-response true :ok) @completed))
 
            ;; can't use dt/current-state, because of 'isolate-state'
            (is (= {:foo "bazzinga"} @final-state))))))))
