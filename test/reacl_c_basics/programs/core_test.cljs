@@ -38,7 +38,7 @@
 
    (a/await
     (testing "does not change state when unmounted"
-      (let [changes (atom [])]
+      (let [last-change (atom nil)]
         (dt/rendering
          (c/isolate-state 0
                           (c/dynamic
@@ -59,13 +59,13 @@
                                   
                                  (c/monitor-state
                                   (fn [prev next]
-                                    (swap! changes conj next)))))))
+                                    (reset! last-change next)))))))
        
          (fn [env]
            (a/async
             (a/await (dt/find env (dt/by-text "done")))
             (a/await (a/timeout 100))
-            (is (= [42] @changes))
+            (is (= 42 @last-change))
             ))))))))
 
 (defn- run-sync [program & [dflt]]
