@@ -1,4 +1,4 @@
-(defproject de.active-group/reacl-c-basics "0.11.8"
+(defproject de.active-group/reacl-c-basics "0.12.0-SNAPSHOT"
   :description "Library with utilities often useful when writing web applications with Reacl-C."
   
   :url "http://github.com/active-group/reacl-c-basics"
@@ -8,7 +8,7 @@
 
   :dependencies [[org.clojure/clojure "1.10.1" :scope "provided"]
                  [org.clojure/clojurescript "1.10.773" :scope "provided"]
-                 [de.active-group/reacl-c "0.11.7" #_"0.12.0-SNAPSHOT"]
+                 [de.active-group/reacl-c "0.12.0-SNAPSHOT"]
                  
                  [de.active-group/active-clojure "0.41.0"]
                  [venantius/accountant "0.2.5"]
