@@ -12,7 +12,19 @@
 
   An attribute `:report-validity` can be set to true on input items
   and [[form]] to call `reportValidity` on them on every state
-  change."
+  change.
+
+  Example:
+  ```
+  (form {:report-validity true
+         :onSubmit #(c/return ...)}
+   (input {:type \"text\"
+           :validate (fn [txt]
+                       (when (clojure.string/blank? txt)
+                         \"No blanksies!\"))})
+    (button {:type \"submit\"} \"Submit\"))
+  ```
+  "
   (:require [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom :include-macros true]
             [active.clojure.lens :as lens]
