@@ -1,7 +1,7 @@
 (ns reacl-c-basics.ajax-test
   (:require [reacl-c-basics.ajax :as ajax]
             [reacl-c.core :as c :include-macros true]
-            [reacl-c.dom :as dom]
+            [reacl-c.dom :as dom :include-macros true]
             [reacl-c.test-util.core :as tuc :include-macros true]
             [reacl-c-basics.jobs.core :as jobs]
             [reacl-c.test-util.dom-testing :as dt]
@@ -146,3 +146,4 @@
                      (fn [res]
                        (is (ajax/response? res))
                        (done))))))))
+

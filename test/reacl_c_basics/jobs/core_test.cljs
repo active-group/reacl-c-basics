@@ -20,7 +20,7 @@
 (defn run-with [options return f]
   (dt/rendering
    (jobs/handle-jobs (dom/button {:data-testid "btn"
-                                  :onclick (fn [_ _]
+                                  :onClick (fn [_ _]
                                              return)})
                      options)
    (fn [env]

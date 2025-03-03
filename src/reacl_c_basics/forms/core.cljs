@@ -275,10 +275,33 @@
   [attrs]
   (value-base dom/textarea attrs))
 
-(dom/defn-dom form
-  "The same as `reacl-c.dom/form`, but with the additional attribute `:report-validity`."
+(dom/defn-dom ^:private base-form
   [attrs & content]
-  (apply with-invalid-attr dom/form attrs content))
+  (apply with-invalid-attr dom/form attrs
+         content))
+
+(defn ^:no-doc new-method [wrapper]
+  ;; wrapper should take [base-form attrs & content] args.
+  {::method-wrapper wrapper})
+
+(defn ^:no-doc custom-method? [v]
+  (and (map? v) (contains? v ::method-wrapper)))
+
+(defn ^:no-doc method-wrapper [m]
+  (::method-wrapper m))
+
+(dom/defn-dom form
+  "The same as `reacl-c.dom/form`, but with the additional attribute `:report-validity`.
+
+   This also supports other `:method` attributes, that for example submit a form via ajax.
+   See [[reacl-c-basics.forms.methods]] for that."
+  [attrs & content]
+  (if (custom-method? (:method attrs))
+    (apply (method-wrapper (:method attrs))
+           base-form
+           (dissoc attrs :method)
+           content)
+    (apply base-form attrs content)))
 
 (defn- lift-type [t]
   (if (type? t)

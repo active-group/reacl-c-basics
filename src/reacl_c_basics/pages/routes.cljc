@@ -54,6 +54,31 @@
                    (some-> (not-empty (into {} (map (fn [[k v]] [(keyword k) v]) (:query-params request))))
                            (vector)))))))
 
+(def ^:private compile-cached
+  ;; should be ok when only used for the finite amount of 'defroutes' in code.
+  ;; but really worth it; it's a heavy computation.
+  (memoize clout/route-compile))
+
+(defn- unparse-uri [pattern & args]
+  (let [{:keys [source re keys absolute?]} (compile-cached pattern)
+        _ (assert (or (= (count args) (count keys))
+                      (= (count args) (inc (count keys)))))
+        positional (map vector
+                        keys
+                        (take (count keys) args))
+        params (if (= (count args) (count keys))
+                 nil
+                 (last args))]
+    (let [s (reduce (fn [s [k v]]
+                      (str/replace s (str k) (url/url-encode (str v))))
+                    source
+                    positional)]
+      (if (empty? params)
+        s
+        (str s "?" (str/join "&" (map (fn [[k v]]
+                                        (str (url/url-encode (name k)) "=" (url/url-encode (str v))))
+                                      params)))))))
+
 (defrecord ^{:private true :no-doc true} Route [pattern]
   #?@(:cljs
       [IFn
@@ -81,28 +106,11 @@
        (-invoke [this a b c d e f g h i j k l m n o p q r s t rest] (apply href this a b c d e f g h i j k l m n o p q r s t rest))
        IRoutable
        (-unparse-uri [_ args]
-                     (let [{:keys [source re keys absolute?]} (clout/route-compile pattern)
-                           _ (assert (or (= (count args) (count keys))
-                                         (= (count args) (inc (count keys)))))
-                           positional (map vector
-                                           keys
-                                           (take (count keys) args))
-                           params (if (= (count args) (count keys))
-                                    nil
-                                    (last args))]
-                       (let [s (reduce (fn [s [k v]]
-                                         (str/replace s (str k) (url/url-encode (str v))))
-                                       source
-                                       positional)]
-                         (if (empty? params)
-                           s
-                           (str s "?" (str/join "&" (map (fn [[k v]]
-                                                           (str (url/url-encode (name k)) "=" (url/url-encode (str v))))
-                                                         params)))))))
+                     (apply unparse-uri pattern args))
        (-parse-uri [this uri]
                    (let [furl (url/url uri)]
                      ;; in particular, we must remove the query params to use clout:
-                     (parse-request (clout/route-compile pattern)
+                     (parse-request (compile-cached pattern)
                                     {:uri (:path furl)
                                      :query-params (:query furl)})))]
       :clj

@@ -18,8 +18,8 @@
 
     (is (= (dom/h1 {:className cname} (dom/div)) (my-header {} (dom/div))))
     (is (= (dom/h1 {:className cname
-                    :onclick :foo})
-           (my-header {:onclick :foo})))
+                    :onClick :foo})
+           (my-header {:onClick :foo})))
     (is (= (dom/h1 {:className cname} (dom/div)) (my-header (dom/div))))
 
     (is (= (dom/h1 {:className (str "foo " cname)})
@@ -29,7 +29,7 @@
     (is (= (dom/h1 {:className (str "foo " cname)})
            (my-header {:class "foo"})))
   
-    (is (= (my-header {:onclick :foo} (dom/div)) (my-header {:onclick :foo} (dom/div))))
+    (is (= (my-header {:onClick :foo} (dom/div)) (my-header {:onClick :foo} (dom/div))))
     ))
 
 (deftest css-test

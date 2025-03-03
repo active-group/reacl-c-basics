@@ -1,0 +1,7 @@
+{:lint-as {reacl-c-basics.pages.routes/defroutes clojure.core/def ;; TODO: some more work tbd to not get 'inline def' warnings.
+           reacl-c-basics.pages.routes/defroute clojure.core/declare
+           reacl-c-basics.workspaces/reacl-c-card clojure.core/do
+           reacl-c-basics.cljss/defstyles clojure.core/defn
+           reacl-c-basics.cljss/defstyled clojure.core/def
+           ;; do-program and defn-program are more complicated... but basically deprecated anyway.
+           }}

@@ -170,7 +170,7 @@ places, use [[integer]]."} strict-integer
 
 (def ^{:doc "An input type for an optional, but non-empty string,
   i.e. the value is never an empty string. This also trims the text
-  entered, so only whitespace becomed `nil` as well."}
+  entered, so pure whitespace becomes `nil` as well."}
   opt-non-empty-string
   (-> opt-string
       (restrict-type
