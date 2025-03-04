@@ -15,8 +15,6 @@ jobs:
       run: |
         lein build-test
         npx karma start --single-run
-    # - name: Run Clojure tests
-    #   run: lein test
 
   notify-test-failures:
     runs-on: ubuntu-latest
