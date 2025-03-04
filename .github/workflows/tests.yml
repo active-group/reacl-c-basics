@@ -1,22 +1,19 @@
 name: Tests
-
 on: [push]
 
 jobs:
-  build:
-
+  test:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v1
+    - uses: ./.github/actions/install-leiningen
     - name: Install dependencies
       run: |
         lein deps
         npm install
-    - name: Run ClojureScript tests 
+    - name: Run ClojureScript tests
       run: |
         lein build-test
         npx karma start --single-run
-#    - name: Run Clojure tests
-#      run: |
-#        lein test
+    # - name: Run Clojure tests
+    #   run: lein test
