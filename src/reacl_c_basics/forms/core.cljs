@@ -218,8 +218,9 @@
 
 (dom/defn-dom option
   "An item that can be used inside a [[select]] element to define a
-  selectable option. The attribute `:value` can be any value, and the
-  contents should be the text shown to the user."
+  selectable option. The attribute `:value` in the attribute map
+  `attrs` can be any value, and the contents should be the text shown
+  to the user."
   [attrs & contents]
   (let [v (:value attrs)
         placeholder (or (:placeholder attrs) ;; overridable, if pr-str is not suitable.
