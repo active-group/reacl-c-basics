@@ -30,96 +30,113 @@
 (deftest handle-jobs-test
   ;; basic functionality
   (async done
-         (-> (let [req  :my-job
-                   resp :my-result
-                   result (atom nil)
-                   states (atom [])]
-               (run-with {:execute (partial async! resp)
-                          :transition
-                          (fn transition [state job]
-                            (is (= (jobs/job-description job) :my-job))
-                            (is (= (jobs/job-info job) :my-info))
+         (let [tid (js/setTimeout (fn []
+                                    (is false "timed out")
+                                    (done))
+                                  100)]
+              (-> (let [req  :my-job
+                        resp :my-result
+                        result (atom nil)
+                        states (atom [])]
+                    (run-with {:execute (partial async! resp)
+                               :transition
+                               (fn transition [state job]
+                                 (is (= (jobs/job-description job) :my-job))
+                                 (is (= (jobs/job-info job) :my-info))
                                        
-                            (swap! states conj (jobs/job-status job))
-                            (when (= :completed (jobs/job-status job))
-                              (reset! result (jobs/job-result job)))
-                            (c/return))}
+                                 (swap! states conj (jobs/job-status job))
+                                 (when (= :completed (jobs/job-status job))
+                                   (reset! result (jobs/job-result job)))
+                                 (c/return))}
                          
-                         (c/return :action (jobs/start-job req :my-info))
+                              (c/return :action (jobs/start-job req :my-info))
                          
-                         (fn [env]
-                           (is (= [:pending :running] @states))
+                              (fn [env]
+                                (is (= [:pending :running] @states))
 
-                           ;; getting completed state/response, asynchronously.
-                           (new js/Promise.
-                                (fn [resolve reject]
-                                  (js/setTimeout (fn []
-                                                   (is (= [:pending :running :completed] @states))
-                                                   (is (= resp @result))
-                                                   (resolve :done))
-                                                 1))))))
-             (.then (fn [_] (done))))))
+                                ;; getting completed state/response, asynchronously.
+                                (new js/Promise.
+                                     (fn [resolve reject]
+                                       (js/setTimeout (fn []
+                                                        (is (= [:pending :running :completed] @states))
+                                                        (is (= resp @result))
+                                                        (resolve :done))
+                                                      1))))))
+                  (.then (fn [_]
+                           (js/clearTimeout tid)
+                           (done)))))))
 
 ;; TODO: a bit unstable
 (deftest handle-jobs-manage-test
   ;; :manage can remove things from the queue.
   (async done
-         (-> (let [req  :my-job
-                   resp :my-result
-                   [completed! completed] (let [a (atom nil)]
-                                            [a
-                                             (new js/Promise (fn [resolve reject]
-                                                               (reset! a resolve)))])
-                   last-queue (atom nil)]
-               (run-with {:execute (partial async! resp)
-                          :transition (fn transition [state job]
-                                        (when (= :completed (jobs/job-status job))
-                                          (@completed! true))
-                                        (c/return))
-                          :manage (fn manage [queue]
-                                    (let [q (if (empty? queue)
-                                              queue
-                                              [(last queue)])]
-                                      (reset! last-queue q)
-                                      q))}
+         (let [tid (js/setTimeout (fn []
+                                    (is false "timed out")
+                                    (done)))]
+           (-> (let [req  :my-job
+                     resp :my-result
+                     [completed! completed] (let [a (atom nil)]
+                                              [a
+                                               (new js/Promise (fn [resolve reject]
+                                                                 (reset! a resolve)))])
+                     last-queue (atom nil)]
+                 (run-with {:execute (partial async! resp)
+                            :transition (fn transition [state job]
+                                          (when (= :completed (jobs/job-status job))
+                                            (@completed! true))
+                                          (c/return))
+                            :manage (fn manage [queue]
+                                      (let [q (if (empty? queue)
+                                                queue
+                                                [(last queue)])]
+                                        (reset! last-queue q)
+                                        q))}
                          
-                         (c/return :action (jobs/start-job req)
-                                   :action (jobs/start-job req)
-                                   :action (jobs/start-job req))
+                           (c/return :action (jobs/start-job req)
+                                     :action (jobs/start-job req)
+                                     :action (jobs/start-job req))
 
-                         (fn [env]
-                           (.then completed
-                                  (fn [_]
-                                    (is (empty? @last-queue)))))))
-             (.then (fn [_] (done))))))
+                           (fn [env]
+                             (.then completed
+                                    (fn [_]
+                                      (is (empty? @last-queue)))))))
+               (.then (fn [_]
+                        (js/clearTimeout tid)
+                        (done)))))))
 
 (deftest handle-jobs-parallelity-test
   ;; only one (N) jobs are executed at a time
   (async done
-         (-> (let [req  :my-job
-                   resp :my-result
-                   states (atom [])]
-               (run-with {:execute (partial sync! resp)
-                          :parallelity 1
-                          :transition (fn transition [state job]
-                                        (swap! states conj [(jobs/job-info job) (jobs/job-status job)])
-                                        (c/return))}
+         (let [tid (js/setTimeout (fn []
+                                    (is false "timed out")
+                                    (done))
+                                  100)]
+           (-> (let [req  :my-job
+                     resp :my-result
+                     states (atom [])]
+                 (run-with {:execute (partial sync! resp)
+                            :parallelity 1
+                            :transition (fn transition [state job]
+                                          (swap! states conj [(jobs/job-info job) (jobs/job-status job)])
+                                          (c/return))}
                          
-                         (c/return :action (jobs/start-job req 1)
-                                   :action (jobs/start-job req 2)
-                                   :action (jobs/start-job req 3))
+                           (c/return :action (jobs/start-job req 1)
+                                     :action (jobs/start-job req 2)
+                                     :action (jobs/start-job req 3))
 
-                         (fn [env]
-                           (new js/Promise
-                                (fn [resolve reject]
-                                  (js/setTimeout (fn []
-                                                   ;; Note: also depends on the order of actions in c/return
+                           (fn [env]
+                             (new js/Promise
+                                  (fn [resolve reject]
+                                    (js/setTimeout (fn []
+                                                     ;; Note: also depends on the order of actions in c/return
 
-                                                   ;; Note: when doing it with 'async!' above, we actually see some kind of non-determinism - :running 3 before the :completed 2
-                                                   #_[[1 :pending] [2 :pending] [3 :pending] [1 :running] [1 :completed] [2 :running] [3 :running] [2 :completed] [3 :completed]]
+                                                     ;; Note: when doing it with 'async!' above, we actually see some kind of non-determinism - :running 3 before the :completed 2
+                                                     #_[[1 :pending] [2 :pending] [3 :pending] [1 :running] [1 :completed] [2 :running] [3 :running] [2 :completed] [3 :completed]]
                                             
-                                                   (is (= [[1 :pending] [2 :pending] [3 :pending] [1 :running] [1 :completed] [2 :running] [2 :completed] [3 :running] [3 :completed]]
-                                                          @states))
-                                                   (resolve))
-                                                 10))))))
-             (.then (fn [_] (done))))))
+                                                     (is (= [[1 :pending] [2 :pending] [3 :pending] [1 :running] [1 :completed] [2 :running] [2 :completed] [3 :running] [3 :completed]]
+                                                            @states))
+                                                     (resolve))
+                                                   10))))))
+               (.then (fn [_]
+                        (js/clearTimeout tid)
+                        (done)))))))

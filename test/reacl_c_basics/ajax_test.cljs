@@ -133,7 +133,11 @@
 
 (deftest real-execute-test
   (async done
-         (let [res (atom nil)
+         (let [tid (js/setTimeout (fn []
+                                    (is false "timed out")
+                                    (done))
+                                  100)
+               res (atom nil)
                p (new js/Promise (fn [resolve reject]
                                    (reset! res resolve)))]
            (dt/rendering
@@ -145,5 +149,6 @@
               (.then p
                      (fn [res]
                        (is (ajax/response? res))
+                       (js/clearTimeout tid)
                        (done))))))))
 
