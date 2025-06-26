@@ -140,15 +140,15 @@
                res (atom nil)
                p (new js/Promise (fn [resolve reject]
                                    (reset! res resolve)))]
-           (dt/rendering
-            (-> (ajax/execute (ajax/GET "http://invalid.invalid/"))
-                (c/handle-action (fn [_ r]
-                                   (@res r)
-                                   r)))
-            (fn [env]
-              (.then p
-                     (fn [res]
-                       (is (ajax/response? res))
-                       (js/clearTimeout tid)
-                       (done))))))))
+           (-> (dt/rendering
+                (-> (ajax/execute (ajax/GET "http://invalid.invalid/"))
+                    (c/handle-action (fn [_ r]
+                                       (@res r)
+                                       r)))
+                (fn [env]
+                  (.then p
+                         (fn [res]
+                           (is (ajax/response? res))
+                           (js/clearTimeout tid)))))
+               (.then done)))))
 
