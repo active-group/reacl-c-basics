@@ -20,7 +20,7 @@
             [lein-auto "0.1.3"]]
 
   :profiles {:dev {:dependencies [[de.active-group/cljs-async "2.0.0"]
-                                  [de.active-group/reacl-c-testing "0.2.0-SNAPSHOT"]]}
+                                  [de.active-group/reacl-c-testing "0.1.0"]]}
              :shadow [:dev {:dependencies [[org.clojure/clojure "1.12.0"]
                                            [org.clojure/clojurescript "1.12.38"]
                                            [de.active-group/reacl-c "0.12.1"]
