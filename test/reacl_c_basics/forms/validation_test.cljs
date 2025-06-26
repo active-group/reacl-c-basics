@@ -1,6 +1,7 @@
 (ns reacl-c-basics.forms.validation-test
   (:require [reacl-c-basics.forms.core :as core]
             [reacl-c-basics.forms.validation :as fval]
+            [reacl-c.main :as main]
             [reacl-c.test-util.dom-testing :as dt]
             [reacl-c.core :as c :include-macros true]
             [reacl-c.dom :as dom :include-macros true]
@@ -21,7 +22,8 @@
    (fn [env]
      (let [input (dt/get env (dt/by-display-value "test"))]
        (dt/set-state! env "")
-       (.reportValidity input) ;; can be an input
+       (main/flush-sync! #(.reportValidity input))
+        ;; can be an input
        (is (some? (dt/query env (dt/by-text "Msg: Must not be empty"))))))))
 
 (deftest with-validity-test-2
@@ -36,7 +38,7 @@
    :state ""
    (fn [env]
      (let [form (dt/get env (dt/by-testid "foo"))]
-       (.reportValidity form) ;; can be a form
+       (main/flush-sync! (.reportValidity form)) ;; can be a form
        (is (some? (dt/query env (dt/by-text "Msg: Must not be empty"))))))))
 
 (deftest report-validity-test
@@ -65,5 +67,5 @@
    :state ""
    (fn [env]
      (let [input (dt/get env (dt/by-testid "foo"))]
-       (.reportValidity input)
+       (main/flush-sync! #(.reportValidity input))
        (is (some? (dt/query env (dt/by-text "Msg: Must not be empty"))))))))
