@@ -14,8 +14,7 @@
                  [clout "2.2.1"]
                  [com.cemerick/url "0.1.1"]
                  [cljs-ajax "0.8.4"]
-                 [clj-commons/cljss "1.6.4"]
-                 [nubank/workspaces "1.1.2" :scope "provided"]]
+                 [clj-commons/cljss "1.6.4"]]
 
   :plugins [[lein-codox "0.10.7"]
             [lein-auto "0.1.3"]]
