@@ -4,6 +4,7 @@
  :fs-watch {:hawk false} ;; see https://github.com/thheller/shadow-cljs/issues/837
  :builds {:test {:target :browser-test
                  :test-dir "target/public/test"
+                 :compiler-options {:output-feature-set :es7}
                  :devtools {:hud #{:errors :warnings :progress}
                             :http-port          9500
                             :http-root          "target/public/test"}}
