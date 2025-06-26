@@ -21,10 +21,8 @@
 
   :profiles {:dev {:dependencies [[de.active-group/cljs-async "2.0.0"]
                                   [de.active-group/reacl-c-testing "0.1.0"]]}
-             :shadow [:dev {:dependencies [[org.clojure/clojure "1.12.0"]
-                                           [org.clojure/clojurescript "1.12.38"]
-                                           [de.active-group/reacl-c "0.12.1"]
-                                           [thheller/shadow-cljs "3.0.4"]
+             :shadow [:dev {:dependencies [[de.active-group/reacl-c "0.12.1"]
+                                           [thheller/shadow-cljs "2.11.7"]
                                            [binaryage/devtools "1.0.2"]]
                             :source-paths ["src" "test" "examples"]
                             :resource-paths ["target" "resources"]}]
