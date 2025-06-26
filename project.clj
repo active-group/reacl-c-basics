@@ -8,7 +8,7 @@
 
   :dependencies [[org.clojure/clojure "1.10.1" :scope "provided"]
                  [org.clojure/clojurescript "1.10.773" :scope "provided"]
-                 [de.active-group/reacl-c "0.12.1"]
+                 [de.active-group/reacl-c "0.11.7"]
                  [de.active-group/active-clojure "0.41.0"]
                  [venantius/accountant "0.2.5"]
                  [clout "2.2.1"]
@@ -23,6 +23,7 @@
                                   [de.active-group/reacl-c-testing "0.2.0-SNAPSHOT"]]}
              :shadow [:dev {:dependencies [[org.clojure/clojure "1.12.0"]
                                            [org.clojure/clojurescript "1.12.38"]
+                                           [de.active-group/reacl-c "0.12.1"]
                                            [thheller/shadow-cljs "3.0.4"]
                                            [binaryage/devtools "1.0.2"]]
                             :source-paths ["src" "test" "examples"]
