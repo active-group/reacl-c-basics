@@ -131,13 +131,15 @@
                             :parallelity nil})
          (ajax/delivery c/empty))))
 
+(defn- timeout [ms]
+  (js/Promise. (fn [resolve]
+                 (js/setTimeout (fn []
+                                  (resolve nil))
+                                ms))))
+
 (deftest real-execute-test
   (async done
-         (let [tid (js/setTimeout (fn []
-                                    (is false "timed out")
-                                    (done))
-                                  100)
-               res (atom nil)
+         (let [res (atom nil)
                p (new js/Promise (fn [resolve reject]
                                    (reset! res resolve)))]
            (-> (dt/rendering
@@ -146,9 +148,13 @@
                                        (@res r)
                                        r)))
                 (fn [env]
-                  (.then p
-                         (fn [res]
-                           (is (ajax/response? res))
-                           (js/clearTimeout tid)))))
+                  (js/Promise.race
+                   [(.then p
+                           (fn [res]
+                             (is (ajax/response? res))))
+                    (-> (timeout 5000)
+                        (.then (fn [_]
+                                 (is false "timed out")
+                                 nil)))])))
                (.then done)))))
 
