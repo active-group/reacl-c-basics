@@ -9,7 +9,7 @@ library for ClojureScript
 
 ## Documentation
 
-The API documentation for the latest release are available [here](https://cljdoc.xyz/d/de.active-group/reacl-c-basics/CURRENT).
+The API documentation for the latest release are available [here](https://cljdoc.org/d/de.active-group/reacl-c-basics/CURRENT).
 
 ## The contents at a glance
 
@@ -19,7 +19,7 @@ namespaces of the library.
 ### Forms and input elements
 
 The namespace
-[`reacl-c-basics.forms.core`](https://cljdoc.xyz/d/de.active-group/reacl-c-basics/CURRENT/api/reacl-c-basics.forms.core)
+[`reacl-c-basics.forms.core`](https://cljdoc.org/d/de.active-group/reacl-c-basics/CURRENT/api/reacl-c-basics.forms.core)
 contains functions very similar to the corresponding DOM elements
 `input`, `textarea`, `select` and `form`, but with the most relevant
 state (the value entered by the user) as their item state.
@@ -34,7 +34,7 @@ Note: `reacl-c-basics.forms` is deprecated.
 #### Advanced and custom input types
 
 The namespace
-[`reacl-c-basics.forms.types`](https://cljdoc.xyz/d/de.active-group/reacl-c-basics/CURRENT/api/reacl-c-basics.forms.types)
+[`reacl-c-basics.forms.types`](https://cljdoc.org/d/de.active-group/reacl-c-basics/CURRENT/api/reacl-c-basics.forms.types)
 contains additional values - called *types* - that can be used for the
 `:type` attribute of the `input` items of
 `reacl-c-basics.forms.core`. It also contains functions to create new
@@ -52,7 +52,7 @@ namely `multiline-string` and `enum` or `string-enum` respectively.
 ### Ajax requests
 
 The namespace
-[`reacl-c-basics.ajax`](https://cljdoc.xyz/d/de.active-group/reacl-c-basics/CURRENT/api/reacl-c-basics.ajax)
+[`reacl-c-basics.ajax`](https://cljdoc.org/d/de.active-group/reacl-c-basics/CURRENT/api/reacl-c-basics.ajax)
 gives you mostly invisible items that perform an Ajax request and give
 you easy access to the results.
 
@@ -60,12 +60,12 @@ you easy access to the results.
 
 For an easy setup of HTML5 Client Side Routing, look at the namespaces
 starting with
-[`reacl-c-basics.pages`](https://cljdoc.xyz/d/de.active-group/reacl-c-basics/CURRENT/api/reacl-c-basics.pages).
+[`reacl-c-basics.pages`](https://cljdoc.org/d/de.active-group/reacl-c-basics/CURRENT/api/reacl-c-basics.pages).
 
 ### Timers and animation frames
 
 The core namespace of the library
-[`reacl-c-basics.core`](https://cljdoc.xyz/d/de.active-group/reacl-c-basics/CURRENT/api/reacl-c-basics.core)
+[`reacl-c-basics.core`](https://cljdoc.org/d/de.active-group/reacl-c-basics/CURRENT/api/reacl-c-basics.core)
 contains useful subscriptions to a JavaScript timer (`timeout` and
 `interval`), and to animation frame timestamps (`animation-frame` and
 `animation-frames`).
