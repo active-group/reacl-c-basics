@@ -33,7 +33,7 @@
 
 (defn ^:no-doc job! ;; probably not useful to anybody.
   "Creates a new job, that you can put into the queue backing
-  up a [[handle-josb]] via the `:manage` option."
+  up a [[handle-job]] via the `:manage` option."
   [description & [info]]
   (make-job (gensym "job") description info :pending nil))
 
@@ -128,7 +128,7 @@
   `item` that adds a new job to an internal queue.
 
   `:execute` Required option: The item function to actually execute
-  the jobs. It is called with the job description and return an item
+  the jobs. It is called with the job description and must return an item
   that must eventually emit an action with the result of the job.
 
   `:predicate` options: A predicate on the job descriptions. If it
